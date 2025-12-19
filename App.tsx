@@ -21,6 +21,7 @@ const BANNER_KEY = 'LONG_PHU_WELCOME_BANNER_SHOWN';
 
 const App: React.FC = () => {
   const [officials, setOfficials] = useState<Official[]>(() => {
+    if (typeof window === 'undefined') return DEFAULT_OFFICIALS;
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -32,6 +33,7 @@ const App: React.FC = () => {
   });
 
   const [schedule, setSchedule] = useState<WorkItem[]>(() => {
+    if (typeof window === 'undefined') return INITIAL_SCHEDULE.map(item => ({ ...item, remind: true }));
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -43,6 +45,7 @@ const App: React.FC = () => {
   });
 
   const [globalNotificationsEnabled, setGlobalNotificationsEnabled] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return true;
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
       try {
@@ -54,6 +57,7 @@ const App: React.FC = () => {
   });
 
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
+    if (typeof window === 'undefined') return false;
     return !sessionStorage.getItem(BANNER_KEY);
   });
 
@@ -68,9 +72,13 @@ const App: React.FC = () => {
   const [editingItem, setEditingItem] = useState<WorkItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<WorkItem | null>(null);
   const [notifiedIds, setNotifiedIds] = useState<Set<string>>(new Set());
-  const [notifPermission, setNotifPermission] = useState<string>(
-    typeof window !== 'undefined' && 'Notification' in window ? (window as any).Notification.permission : 'default'
-  );
+  
+  const [notifPermission, setNotifPermission] = useState<string>(() => {
+    if (typeof globalThis !== 'undefined' && (globalThis as any).Notification) {
+      return (globalThis as any).Notification.permission;
+    }
+    return 'default';
+  });
   
   const [selectedDate, setSelectedDate] = useState(new Date(2025, 11, 15)); 
   const [formPrefill, setFormPrefill] = useState<{date: string, officialId: string} | null>(null);
@@ -85,6 +93,7 @@ const App: React.FC = () => {
   };
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
       e.returnValue = "Hệ thống khuyến nghị bạn sao lưu dữ liệu trước khi thoát.";
@@ -101,6 +110,7 @@ const App: React.FC = () => {
   }, [officials]);
 
   useEffect(() => {
+    if (typeof window === 'undefined') return;
     const state: SystemState = {
       version: '1.0',
       timestamp: Date.now(),
@@ -126,7 +136,8 @@ const App: React.FC = () => {
   }, [selectedDate]);
 
   const sendSystemNotification = (title: string, body: string, item?: WorkItem) => {
-    if (globalNotificationsEnabled && notifPermission === 'granted' && 'Notification' in window) {
+    const safeGlobal = globalThis as any;
+    if (globalNotificationsEnabled && notifPermission === 'granted' && safeGlobal.Notification) {
       const options = {
         body: body,
         icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
@@ -134,20 +145,21 @@ const App: React.FC = () => {
       };
       
       try {
-        const n = new (window as any).Notification(title, options);
+        const n = new safeGlobal.Notification(title, options);
         n.onclick = () => {
           window.focus();
           n.close();
         };
       } catch (e) {
-        console.error("Lỗi gửi thông báo hệ thống:", e);
+        console.error("Notification Error:", e);
       }
     }
   };
 
   const requestNotifPermission = async () => {
-    if ('Notification' in window) {
-      const permission = await (window as any).Notification.requestPermission();
+    const safeGlobal = globalThis as any;
+    if (safeGlobal.Notification) {
+      const permission = await safeGlobal.Notification.requestPermission();
       setNotifPermission(permission);
       if (permission === 'granted') {
         sendSystemNotification("Đã bật thông báo", "Hệ thống sẽ gửi nhắc nhở công việc trực tiếp lên màn hình.");
