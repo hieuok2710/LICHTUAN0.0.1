@@ -20,7 +20,7 @@ export interface WorkItem {
   remind?: boolean;
 }
 
-export interface Notification {
+export interface TaskAlert {
   id: string;
   timestamp: number;
   message: string;

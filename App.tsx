@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect, useMemo, useRef } from 'react';
 import { OFFICIALS as DEFAULT_OFFICIALS, INITIAL_SCHEDULE } from './constants';
-import { WorkItem, Official, Notification, SystemState } from './types';
+import { WorkItem, Official, TaskAlert, SystemState } from './types';
 import WeeklyScheduleTable from './components/WeeklyScheduleTable';
 import ReminderPopup from './components/ReminderPopup';
 import NotificationCenter from './components/NotificationCenter';
@@ -20,7 +20,6 @@ const STORAGE_KEY = 'LONG_PHU_WORK_SCHEDULE_STATE';
 const BANNER_KEY = 'LONG_PHU_WELCOME_BANNER_SHOWN';
 
 const App: React.FC = () => {
-  // Load data from localStorage or use defaults
   const [officials, setOfficials] = useState<Official[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -55,12 +54,11 @@ const App: React.FC = () => {
   });
 
   const [showWelcome, setShowWelcome] = useState<boolean>(() => {
-    // Show banner on every reload if not dismissed in current session
     return !sessionStorage.getItem(BANNER_KEY);
   });
 
   const [activePopup, setActivePopup] = useState<{item: WorkItem, official: Official, type: 'daily' | 'upcoming'} | null>(null);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
+  const [taskAlerts, setTaskAlerts] = useState<TaskAlert[]>([]);
   const [showNotiCenter, setShowNotiCenter] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [currentUser, setCurrentUser] = useState<Official | null>(null);
@@ -70,8 +68,8 @@ const App: React.FC = () => {
   const [editingItem, setEditingItem] = useState<WorkItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<WorkItem | null>(null);
   const [notifiedIds, setNotifiedIds] = useState<Set<string>>(new Set());
-  const [notifPermission, setNotifPermission] = useState<NotificationPermission>(
-    typeof window !== 'undefined' ? window.Notification.permission : 'default'
+  const [notifPermission, setNotifPermission] = useState<string>(
+    typeof window !== 'undefined' && 'Notification' in window ? (window as any).Notification.permission : 'default'
   );
   
   const [selectedDate, setSelectedDate] = useState(new Date(2025, 11, 15)); 
@@ -83,14 +81,13 @@ const App: React.FC = () => {
   const dismissWelcome = () => {
     setShowWelcome(false);
     sessionStorage.setItem(BANNER_KEY, 'true');
-    // Scroll to table smoothly
     mainContentRef.current?.scrollIntoView({ behavior: 'smooth' });
   };
 
   useEffect(() => {
     const handleBeforeUnload = (e: BeforeUnloadEvent) => {
       e.preventDefault();
-      e.returnValue = "Hệ thống khuyến nghị bạn sao lưu dữ liệu trước khi thoát để đảm bảo an toàn tuyệt đối. Bạn có chắc chắn muốn rời đi?";
+      e.returnValue = "Hệ thống khuyến nghị bạn sao lưu dữ liệu trước khi thoát.";
       return e.returnValue;
     };
     window.addEventListener('beforeunload', handleBeforeUnload);
@@ -129,27 +126,32 @@ const App: React.FC = () => {
   }, [selectedDate]);
 
   const sendSystemNotification = (title: string, body: string, item?: WorkItem) => {
-    if (globalNotificationsEnabled && notifPermission === 'granted') {
-      const options: NotificationOptions = {
+    if (globalNotificationsEnabled && notifPermission === 'granted' && 'Notification' in window) {
+      const options = {
         body: body,
         icon: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-        badge: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png',
-        tag: item?.id || 'general-notif'
+        tag: item?.id || 'general-alert'
       };
       
-      const n = new Notification(title, options);
-      n.onclick = () => {
-        window.focus();
-        n.close();
-      };
+      try {
+        const n = new (window as any).Notification(title, options);
+        n.onclick = () => {
+          window.focus();
+          n.close();
+        };
+      } catch (e) {
+        console.error("Lỗi gửi thông báo hệ thống:", e);
+      }
     }
   };
 
   const requestNotifPermission = async () => {
-    const permission = await Notification.requestPermission();
-    setNotifPermission(permission);
-    if (permission === 'granted') {
-      sendSystemNotification("Đã bật thông báo", "Hệ thống sẽ gửi nhắc nhở công việc trực tiếp lên màn hình của bạn.");
+    if ('Notification' in window) {
+      const permission = await (window as any).Notification.requestPermission();
+      setNotifPermission(permission);
+      if (permission === 'granted') {
+        sendSystemNotification("Đã bật thông báo", "Hệ thống sẽ gửi nhắc nhở công việc trực tiếp lên màn hình.");
+      }
     }
   };
 
@@ -165,7 +167,7 @@ const App: React.FC = () => {
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = `backup_lich_cong_tac_${new Date().toISOString().split('T')[0]}.json`;
+    a.download = `backup_lich_${new Date().toISOString().split('T')[0]}.json`;
     a.click();
     URL.revokeObjectURL(url);
   };
@@ -180,13 +182,11 @@ const App: React.FC = () => {
           setOfficials(data.officials);
           setSchedule(data.schedule);
           if (data.settings) setGlobalNotificationsEnabled(data.settings.notificationsEnabled);
-          alert("Khôi phục dữ liệu thành công!");
+          alert("Khôi phục thành công!");
           setShowSettings(false);
-        } else {
-          throw new Error("File không đúng định dạng backup.");
         }
       } catch (err) {
-        alert("Lỗi: Không thể khôi phục dữ liệu. Vui lòng kiểm tra lại file backup.");
+        alert("Lỗi file backup.");
       }
     };
     reader.readAsText(file);
@@ -208,108 +208,31 @@ const App: React.FC = () => {
         const content = items.length > 0 
           ? items.map(item => `<div><span style="font-weight:bold">- ${item.period}: ${item.time.replace(':', 'h')}</span>, ${item.description} <span style="font-weight:bold">(${item.location})</span></div>`).join('<div style="margin-top:4px;"></div>')
           : '<div style="font-style:italic; font-size:11px; color:#666;">- Làm việc thường xuyên</div>';
-        return `<td style="border:1px solid black; padding:8px; vertical-align:top; text-align:justify; width: ${88/officials.length}%;">${content}</td>`;
+        return `<td style="border:1px solid black; padding:8px; vertical-align:top; text-align:justify;">${content}</td>`;
       }).join('');
 
-      return `<tr>
-        <td style="border:1px solid black; padding:8px; text-align:center; vertical-align:top; font-weight:bold; width:12%;">${day}<br/>${dateStr}</td>
-        ${columns}
-      </tr>`;
+      return `<tr><td style="border:1px solid black; padding:8px; text-align:center; font-weight:bold;">${day}<br/>${dateStr}</td>${columns}</tr>`;
     }).join('');
 
     const headerCols = officials.map(off => `
-      <th style="border:1px solid black; padding:8px; text-align:center; font-weight:bold; background-color:#f2f2f2;">
-        ${off.title}<br/>Đ/c ${off.name}
-      </th>
+      <th style="border:1px solid black; padding:8px; text-align:center; font-weight:bold; background-color:#f2f2f2;">${off.title}<br/>Đ/c ${off.name}</th>
     `).join('');
 
     const htmlContent = `
-      <!DOCTYPE html>
       <html>
-      <head>
-        <meta charset="utf-8">
-        <title>Lịch Công Tác Tuần - Phường Long Phú</title>
-        <link href="https://fonts.googleapis.com/css2?family=Tinos:ital,wght@0,400;0,700;1,400&display=swap" rel="stylesheet">
-        <style>
-          body { font-family: 'Tinos', serif; line-height: 1.4; color: black; margin: 0; padding: 10mm 15mm; }
-          .header { display: flex; justify-content: space-between; margin-bottom: 25px; }
-          .header-left { text-align: center; width: 40%; }
-          .header-right { text-align: center; width: 50%; }
-          .title { text-align: center; margin-bottom: 25px; }
-          .title h1 { font-size: 19px; margin: 0; text-transform: uppercase; }
-          .title h2 { font-size: 17px; margin: 5px 0; }
-          .date-range { font-size: 17px; font-weight: bold; }
-          table { width: 100%; border-collapse: collapse; font-size: 13px; table-layout: fixed; }
-          .footer { margin-top: 40px; display: flex; justify-content: space-between; page-break-inside: avoid; }
-          .footer-left { width: 40%; font-size: 11px; font-style: italic; }
-          .footer-right { width: 40%; text-align: center; }
-          @media print {
-            body { padding: 0; }
-            @page { size: A4 landscape; margin: 10mm; }
-          }
-        </style>
-      </head>
+      <head><meta charset="utf-8"><title>Lịch Công Tác</title><style>body { font-family: 'Times New Roman', serif; padding: 20px; } table { width: 100%; border-collapse: collapse; } th, td { border: 1px solid black; padding: 5px; font-size: 12px; }</style></head>
       <body>
-        <div class="header">
-          <div class="header-left">
-            <p style="margin:0; font-size:12px; text-transform:uppercase;">ĐẢNG ỦY PHƯỜNG LONG PHÚ</p>
-            <p style="margin:0; font-size:12px; font-weight:bold;">VĂN PHÒNG</p>
-            <p style="margin:3px 0 0 0;">*</p>
-          </div>
-          <div class="header-right">
-            <p style="margin:0; font-size:12px; font-weight:bold; text-transform:uppercase; text-decoration:underline; text-underline-offset: 3px;">ĐẢNG CỘNG SẢN VIỆT NAM</p>
-            <p style="margin:10px 0 0 0; font-style:italic; font-size:11px;">Long Phú, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}</p>
-          </div>
-        </div>
-
-        <div class="title">
-          <h1>THÔNG BÁO</h1>
-          <h2>Chương trình công tác của Thường trực Đảng ủy</h2>
-          <div class="date-range">(Từ ngày ${startStr} đến ngày ${endStr})</div>
-          <div style="width:60px; border-bottom:2px solid black; margin: 10px auto;"></div>
-        </div>
-
-        <table>
-          <thead>
-            <tr>
-              <th style="border:1px solid black; padding:8px; width:10%; background-color:#f2f2f2;">Thứ/Ngày</th>
-              ${headerCols}
-            </tr>
-          </thead>
-          <tbody>
-            ${tableRows}
-          </tbody>
-        </table>
-
-        <div class="footer">
-          <div class="footer-left">
-            <p style="font-weight:bold; text-decoration:underline; margin-bottom:5px;">Nơi nhận:</p>
-            <p style="margin:2px 0;">- Ban Thường vụ Đảng bộ;</p>
-            <p style="margin:2px 0;">- Các chi bộ trực thuộc;</p>
-            <p style="margin:2px 0;">- Lưu VP Đảng ủy.</p>
-          </div>
-          <div class="footer-right">
-            <p style="font-weight:bold; font-size:13px; text-transform:uppercase; margin-bottom:80px;">CHÁNH VĂN PHÒNG</p>
-            <p style="font-weight:bold; font-size:13px;">Nguyễn Thế Anh</p>
-          </div>
-        </div>
-
-        <script>
-          window.onload = function() {
-            setTimeout(() => { window.print(); }, 500);
-          };
-        </script>
+        <h2 style="text-align:center;">LỊCH CÔNG TÁC TUẦN</h2>
+        <p style="text-align:center;">Từ ${startStr} đến ${endStr}</p>
+        <table><thead><tr><th>Ngày</th>${headerCols}</tr></thead><tbody>${tableRows}</tbody></table>
+        <script>window.onload = () => { window.print(); };</script>
       </body>
       </html>
     `;
 
     const blob = new Blob([htmlContent], { type: 'text/html' });
     const url = URL.createObjectURL(blob);
-    const printWindow = window.open(url, '_blank');
-    if (!printWindow) {
-      alert('Vui lòng cho phép trình duyệt mở cửa sổ mới để xuất PDF.');
-    }
-    setTimeout(() => URL.revokeObjectURL(url), 60000);
+    window.open(url, '_blank');
   };
 
   useEffect(() => {
@@ -327,11 +250,11 @@ const App: React.FC = () => {
         if (!notifiedIds.has(dailyKey)) {
           const todaysItems = schedule.filter(item => item.date === todayISO && item.officialId === currentUser.id);
           if (todaysItems.length > 0) {
-            const msg = `Hôm nay bạn có ${todaysItems.length} công việc cần thực hiện.`;
-            setNotifications(prev => [{
+            const msg = `Hôm nay có ${todaysItems.length} công việc.`;
+            setTaskAlerts(prev => [{
               id: Math.random().toString(36).substr(2, 9),
               timestamp: Date.now(),
-              message: `[NHẮC LỊCH SÁNG] ${msg}`,
+              message: `[LỊCH SÁNG] ${msg}`,
               type: 'daily',
               officialId: currentUser.id,
               read: false
@@ -352,8 +275,8 @@ const App: React.FC = () => {
         if (diffInMinutes === 60) {
           const upcomingKey = `upcoming-60-${item.id}`;
           if (!notifiedIds.has(upcomingKey)) {
-            const msg = `"${item.description}" sẽ bắt đầu sau 60 phút tại ${item.location}.`;
-            setNotifications(prev => [{
+            const msg = `"${item.description}" bắt đầu sau 60 phút.`;
+            setTaskAlerts(prev => [{
               id: Math.random().toString(36).substr(2, 9),
               timestamp: Date.now(),
               message: `[NHẮC VIỆC] ${msg}`,
@@ -374,7 +297,7 @@ const App: React.FC = () => {
   }, [currentUser, schedule, notifiedIds, notifPermission, globalNotificationsEnabled]);
 
   const handleMarkNotiRead = (id: string) => {
-    setNotifications(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
+    setTaskAlerts(prev => prev.map(n => n.id === id ? { ...n, read: true } : n));
   };
 
   const nextWeek = () => {
@@ -424,84 +347,39 @@ const App: React.FC = () => {
           <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
             <div className="flex justify-between items-center h-16">
               <div className="flex items-center gap-4">
-                <div className="bg-red-600 text-white p-2 rounded-lg shadow-lg shadow-red-200">
+                <div className="bg-red-600 text-white p-2 rounded-lg shadow-lg">
                   <Calendar size={24} />
                 </div>
                 <div>
                   <h1 className="text-xl font-black text-slate-900 tracking-tight uppercase">Phường Long Phú</h1>
-                  <p className="text-[10px] text-red-600 font-black uppercase tracking-widest">Hệ Thống Lịch Công Tác</p>
+                  <p className="text-[10px] text-red-600 font-black uppercase tracking-widest">Lịch Công Tác</p>
                 </div>
               </div>
 
               <div className="flex items-center gap-2">
-                <button 
-                  onClick={() => setShowSettings(true)}
-                  className="p-2 text-slate-500 hover:text-blue-600 hover:bg-slate-50 rounded-lg transition-all"
-                  title="Cấu hình hệ thống"
-                >
-                  <Settings size={20} />
-                </button>
-
-                <div className="h-6 w-px bg-slate-200 mx-1 hidden md:block"></div>
-
-                <button 
-                  onClick={() => setShowPreviewModal(true)}
-                  className="hidden md:flex items-center gap-2 bg-white hover:bg-slate-50 text-slate-700 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all active:scale-95"
-                >
-                  <Eye size={16} />
-                  XEM TRƯỚC
-                </button>
-                <button 
-                  onClick={handleExportPDF}
-                  className="hidden md:flex items-center gap-2 bg-slate-900 hover:bg-black text-white px-3 py-2 rounded-lg text-xs font-bold shadow-lg shadow-slate-200 transition-all active:scale-95"
-                >
-                  <FileDown size={16} />
-                  XUẤT PDF
-                </button>
+                <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-blue-600 rounded-lg transition-all"><Settings size={20} /></button>
+                <button onClick={() => setShowPreviewModal(true)} className="hidden md:flex items-center gap-2 bg-white text-slate-700 px-3 py-2 rounded-lg text-xs font-bold border border-slate-200 transition-all"><Eye size={16} />XEM TRƯỚC</button>
+                <button onClick={handleExportPDF} className="hidden md:flex items-center gap-2 bg-slate-900 text-white px-3 py-2 rounded-lg text-xs font-bold shadow-lg transition-all"><FileDown size={16} />XUẤT PDF</button>
                 
                 <div className="ml-2 flex items-center gap-2 bg-slate-50 rounded-full px-3 py-1.5 border border-slate-200">
                   <User size={14} className="text-slate-400" />
-                  <select 
-                    className="text-xs bg-transparent border-none rounded-full focus:ring-0 outline-none font-bold cursor-pointer pr-2"
-                    onChange={(e) => {
-                      const user = officials.find(o => o.id === e.target.value);
-                      setCurrentUser(user || null);
-                    }}
-                    value={currentUser?.id || ''}
-                  >
-                    {officials.map(o => (
-                      <option key={o.id} value={o.id}>{o.name}</option>
-                    ))}
+                  <select className="text-xs bg-transparent border-none rounded-full font-bold cursor-pointer" onChange={(e) => { const user = officials.find(o => o.id === e.target.value); setCurrentUser(user || null); }} value={currentUser?.id || ''}>
+                    {officials.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
                   </select>
                 </div>
                 
-                {/* Global Notification Toggle */}
                 <div className="flex items-center gap-2 px-2 py-1 bg-slate-50 rounded-full border border-slate-200 ml-2">
-                  <div 
-                    className={`p-1 rounded-full transition-colors ${globalNotificationsEnabled ? 'text-red-600' : 'text-slate-400'}`}
-                    title={globalNotificationsEnabled ? "Thông báo đang bật" : "Thông báo đang tắt"}
-                  >
+                  <div className={`p-1 rounded-full transition-colors ${globalNotificationsEnabled ? 'text-red-600' : 'text-slate-400'}`}>
                     {globalNotificationsEnabled ? <BellRing size={14} /> : <BellOff size={14} />}
                   </div>
-                  <button 
-                    onClick={() => setGlobalNotificationsEnabled(!globalNotificationsEnabled)}
-                    className={`relative inline-flex h-5 w-9 shrink-0 cursor-pointer rounded-full border-2 border-transparent transition-colors duration-200 ease-in-out focus:outline-none ${globalNotificationsEnabled ? 'bg-red-600' : 'bg-slate-300'}`}
-                    aria-label="Bật/tắt toàn bộ thông báo"
-                  >
-                    <span 
-                      className={`pointer-events-none inline-block h-4 w-4 transform rounded-full bg-white shadow ring-0 transition duration-200 ease-in-out ${globalNotificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} 
-                    />
-                  </button>
+                  <button onClick={() => setGlobalNotificationsEnabled(!globalNotificationsEnabled)} className={`relative inline-flex h-5 w-9 rounded-full transition-colors ${globalNotificationsEnabled ? 'bg-red-600' : 'bg-slate-300'}`}><span className={`inline-block h-4 w-4 transform rounded-full bg-white transition ${globalNotificationsEnabled ? 'translate-x-4' : 'translate-x-0'}`} /></button>
                 </div>
 
-                <button 
-                  onClick={() => setShowNotiCenter(!showNotiCenter)}
-                  className="relative p-2 text-slate-500 hover:text-red-600 transition-colors ml-1" 
-                >
-                  <Bell size={20} className={notifications.filter(n => !n.read && n.officialId === currentUser?.id).length > 0 ? 'animate-pulse text-red-600' : ''} />
-                  {notifications.filter(n => !n.read && n.officialId === currentUser?.id).length > 0 && (
-                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white text-[9px] font-black rounded-full border-2 border-white flex items-center justify-center">
-                      {notifications.filter(n => !n.read && n.officialId === currentUser?.id).length}
+                <button onClick={() => setShowNotiCenter(!showNotiCenter)} className="relative p-2 text-slate-500 hover:text-red-600 transition-colors ml-1">
+                  <Bell size={20} className={taskAlerts.filter(n => !n.read && n.officialId === currentUser?.id).length > 0 ? 'animate-pulse text-red-600' : ''} />
+                  {taskAlerts.filter(n => !n.read && n.officialId === currentUser?.id).length > 0 && (
+                    <span className="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center">
+                      {taskAlerts.filter(n => !n.read && n.officialId === currentUser?.id).length}
                     </span>
                   )}
                 </button>
@@ -514,52 +392,28 @@ const App: React.FC = () => {
           {showWelcome && <WelcomeHero onDismiss={dismissWelcome} />}
 
           {notifPermission !== 'granted' && globalNotificationsEnabled && (
-            <div className="max-w-7xl mx-auto mb-6 bg-blue-600 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl shadow-blue-100">
-              <div className="flex items-center gap-3">
-                <BellRing size={24} />
-                <p className="text-sm font-bold">Hãy bật thông báo hệ thống để không bỏ lỡ lịch công tác quan trọng.</p>
-              </div>
-              <button 
-                onClick={requestNotifPermission}
-                className="bg-white text-blue-600 px-4 py-2 rounded-xl text-xs font-black uppercase tracking-widest hover:bg-slate-100 transition-all"
-              >
-                Kích hoạt ngay
-              </button>
+            <div className="max-w-7xl mx-auto mb-6 bg-blue-600 text-white p-4 rounded-2xl flex items-center justify-between shadow-xl">
+              <div className="flex items-center gap-3"><BellRing size={24} /><p className="text-sm font-bold">Hãy bật thông báo hệ thống để không bỏ lỡ lịch quan trọng.</p></div>
+              <button onClick={requestNotifPermission} className="bg-white text-blue-600 px-4 py-2 rounded-xl text-xs font-black uppercase">Kích hoạt ngay</button>
             </div>
           )}
 
           <div ref={mainContentRef} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex flex-wrap items-center justify-between gap-4">
             <div className="flex items-center gap-2">
-              <button onClick={prevWeek} className="p-2 hover:bg-slate-50 rounded-lg text-slate-600 transition-colors"><ChevronLeft size={20}/></button>
-              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 font-bold text-slate-700">
+              <button onClick={prevWeek} className="p-2 hover:bg-slate-50 rounded-lg transition-colors"><ChevronLeft size={20}/></button>
+              <div className="flex items-center gap-2 px-3 py-2 bg-slate-50 rounded-lg border border-slate-200 font-bold">
                 <CalendarDays size={18} className="text-red-600" />
-                <span className="text-base font-black">Tuần: {weekRange.start.toLocaleDateString('vi-VN')} - {weekRange.end.toLocaleDateString('vi-VN')}</span>
+                <span>Tuần: {weekRange.start.toLocaleDateString('vi-VN')} - {weekRange.end.toLocaleDateString('vi-VN')}</span>
               </div>
-              <button onClick={nextWeek} className="p-2 hover:bg-slate-50 rounded-lg text-slate-600 transition-colors"><ChevronRight size={20}/></button>
+              <button onClick={nextWeek} className="p-2 hover:bg-slate-50 rounded-lg transition-colors"><ChevronRight size={20}/></button>
             </div>
 
             <div className="flex items-center gap-2">
               <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200 mr-2">
-                <button 
-                    onClick={() => setView('weekly')}
-                    className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase transition-all ${view === 'weekly' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    Toàn bộ
-                </button>
-                <button 
-                    onClick={() => setView('personal')}
-                    className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase transition-all ${view === 'personal' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
-                >
-                    Cá nhân
-                </button>
+                <button onClick={() => setView('weekly')} className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase transition-all ${view === 'weekly' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500'}`}>Toàn bộ</button>
+                <button onClick={() => setView('personal')} className={`px-3 py-1.5 rounded-md text-[10px] font-black uppercase transition-all ${view === 'personal' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500'}`}>Cá nhân</button>
               </div>
-              <button 
-                onClick={() => {setEditingItem(null); setFormPrefill(null); setIsFormOpen(true);}}
-                className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-all"
-              >
-                <Plus size={16} />
-                THÊM LỊCH
-              </button>
+              <button onClick={() => {setEditingItem(null); setFormPrefill(null); setIsFormOpen(true);}} className="flex items-center gap-2 bg-red-600 text-white px-4 py-2 rounded-lg text-xs font-bold hover:bg-red-700 shadow-lg shadow-red-100 transition-all"><Plus size={16} />THÊM LỊCH</button>
             </div>
           </div>
 
@@ -568,7 +422,7 @@ const App: React.FC = () => {
               <div className="flex flex-col items-center mb-10 border-b border-slate-100 pb-8 text-center">
                 <h2 className="text-3xl font-black text-red-700 uppercase tracking-tighter">THÔNG BÁO</h2>
                 <h3 className="text-xl font-bold text-slate-800 mt-1">Chương trình công tác của Thường trực Đảng ủy</h3>
-                <div className="mt-4 text-slate-700 font-black text-[16px] bg-red-50 px-8 py-2.5 rounded-full border border-red-100 shadow-sm">
+                <div className="mt-4 text-slate-700 font-black text-[16px] bg-red-50 px-8 py-2.5 rounded-full border border-red-100">
                   (Từ ngày {weekRange.start.toLocaleDateString('vi-VN')} đến ngày {weekRange.end.toLocaleDateString('vi-VN')})
                 </div>
               </div>
@@ -586,10 +440,10 @@ const App: React.FC = () => {
 
         {showNotiCenter && (
           <NotificationCenter 
-            notifications={notifications.filter(n => n.officialId === currentUser?.id)}
+            notifications={taskAlerts.filter(n => n.officialId === currentUser?.id)}
             onClose={() => setShowNotiCenter(false)}
             onMarkRead={handleMarkNotiRead}
-            onClearAll={() => setNotifications([])}
+            onClearAll={() => setTaskAlerts([])}
             notifPermission={notifPermission}
             onRequestPermission={requestNotifPermission}
           />
@@ -605,37 +459,16 @@ const App: React.FC = () => {
           />
         )}
 
-        <ConfirmationModal
-          isOpen={!!itemToDelete}
-          message="Bạn có chắc chắn muốn xóa mục lịch này không?"
-          onConfirm={confirmDeleteWork}
-          onCancel={() => setItemToDelete(null)}
-        />
+        <ConfirmationModal isOpen={!!itemToDelete} message="Bạn có chắc chắn muốn xóa mục lịch này?" onConfirm={confirmDeleteWork} onCancel={() => setItemToDelete(null)} />
 
         {showPreviewModal && (
           <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[60] flex items-center justify-center p-4">
-            <div className="bg-white rounded-2xl shadow-2xl max-w-[95vw] w-[1100px] max-h-[95vh] flex flex-col animate-popup-in border border-slate-200 overflow-hidden">
+            <div className="bg-white rounded-2xl shadow-2xl max-w-[95vw] w-[1100px] max-h-[95vh] flex flex-col border border-slate-200 overflow-hidden">
               <div className="p-4 border-b border-slate-200 flex justify-between items-center bg-slate-50">
-                <div className="flex items-center gap-2">
-                  <div className="w-8 h-8 bg-slate-200 rounded-lg flex items-center justify-center text-slate-600">
-                    <Eye size={18} />
-                  </div>
-                  <span className="text-sm font-black text-slate-800 uppercase tracking-tight">Xem trước văn bản (Khổ ngang)</span>
-                </div>
+                <span className="text-sm font-black text-slate-800 uppercase">Xem trước văn bản</span>
                 <div className="flex items-center gap-3">
-                  <button 
-                    onClick={handleExportPDF}
-                    className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl text-xs font-black hover:bg-red-700 shadow-lg shadow-red-100 transition-all active:scale-95"
-                  >
-                    <Printer size={16} />
-                    XUẤT PDF / IN NGAY
-                  </button>
-                  <button 
-                    onClick={() => setShowPreviewModal(false)} 
-                    className="p-2 text-slate-400 hover:text-slate-600 hover:bg-slate-100 rounded-lg transition-all"
-                  >
-                    <X size={24} />
-                  </button>
+                  <button onClick={handleExportPDF} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-red-100 transition-all"><Printer size={16} />XUẤT PDF / IN</button>
+                  <button onClick={() => setShowPreviewModal(false)} className="p-2 text-slate-400 hover:text-slate-600"><X size={24} /></button>
                 </div>
               </div>
               <div className="flex-1 overflow-y-auto p-12 bg-slate-100/50 flex flex-col items-center">
@@ -647,24 +480,9 @@ const App: React.FC = () => {
           </div>
         )}
 
-        <WorkItemFormModal 
-          isOpen={isFormOpen}
-          onClose={() => {setIsFormOpen(false); setEditingItem(null); setFormPrefill(null);}}
-          onSubmit={handleFormSubmit}
-          editingItem={editingItem}
-          officials={officials}
-          prefill={formPrefill}
-          selectedDate={selectedDate}
-        />
+        <WorkItemFormModal isOpen={isFormOpen} onClose={() => {setIsFormOpen(false); setEditingItem(null); setFormPrefill(null);}} onSubmit={handleFormSubmit} editingItem={editingItem} officials={officials} prefill={formPrefill} selectedDate={selectedDate} />
 
-        {activePopup && (
-          <ReminderPopup 
-            item={activePopup.item} 
-            official={activePopup.official} 
-            type={activePopup.type}
-            onClose={() => setActivePopup(null)} 
-          />
-        )}
+        {activePopup && <ReminderPopup item={activePopup.item} official={activePopup.official} type={activePopup.type} onClose={() => setActivePopup(null)} />}
       </div>
     </div>
   );
