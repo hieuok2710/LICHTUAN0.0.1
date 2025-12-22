@@ -58,7 +58,7 @@ const WorkItemCard = React.memo(({
       <div className="flex items-center justify-between mb-1.5 pr-14">
         <div className="flex items-center gap-1.5 text-[10px] font-black text-red-700 uppercase">
           <Clock size={12} className="shrink-0" />
-          <span>{item.period}: {item.time.replace(':', 'h')}</span>
+          <span>{item.period}: {item.time}</span>
         </div>
         {item.remind && (
           <div className="flex items-center gap-1 text-[8px] font-black text-white bg-red-600 px-1.5 py-0.5 rounded-full uppercase shadow-sm">

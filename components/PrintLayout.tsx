@@ -81,7 +81,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
                         <div className="space-y-2">
                           {officialItems.map(item => (
                             <div key={item.id} className="mb-1">
-                              <span className="font-bold">- {item.period}: {item.time.replace(':', 'h')}</span>, {item.description} <span className="font-bold">({item.location})</span>
+                              <span className="font-bold">- {item.period}: {item.time}</span>, {item.description} <span className="font-bold">({item.location})</span>
                             </div>
                           ))}
                         </div>
