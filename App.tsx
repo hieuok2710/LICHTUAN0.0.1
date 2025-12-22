@@ -19,7 +19,11 @@ import {
 const STORAGE_KEY = 'LONG_PHU_WORK_SCHEDULE_STATE_V1_FIX';
 const BANNER_KEY = 'LONG_PHU_WELCOME_BANNER_SHOWN';
 
-// LƯU Ý: Cần thay thế Client ID thực tế từ Google Cloud Console
+// LƯU Ý QUAN TRỌNG: Bạn cần tạo OAuth 2.0 Client ID tại https://console.cloud.google.com/
+// 1. Tạo Project mới -> APIs & Services -> Credentials -> Create Credentials -> OAuth client ID
+// 2. Application type: Web application
+// 3. Authorized JavaScript origins: Thêm domain chạy app (ví dụ http://localhost:5173 hoặc domain vercel)
+// 4. Copy Client ID dán vào dưới đây:
 const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
 const SCOPES = "https://www.googleapis.com/auth/calendar.events";
 
@@ -107,11 +111,12 @@ const App: React.FC = () => {
       if (gapi) {
         gapi.load('client', async () => {
           try {
+            // KHẮC PHỤC LỖI: Không truyền apiKey vào gapi.client.init nếu không chắc chắn key hợp lệ cho Calendar API.
+            // Chúng ta sẽ dựa vào OAuth2 Access Token để xác thực và gọi API.
             await gapi.client.init({
-              apiKey: process.env.API_KEY,
               discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
             });
-            console.log("GAPI client initialized");
+            console.log("GAPI client initialized success");
           } catch (e: any) { 
             const errorMsg = e?.message || (typeof e === 'object' ? JSON.stringify(e) : String(e));
             console.error("Gapi init error:", errorMsg); 
@@ -224,8 +229,13 @@ const App: React.FC = () => {
   };
 
   const handleSyncToGoogle = async () => {
+    if (GOOGLE_CLIENT_ID.includes("YOUR_GOOGLE_CLIENT_ID")) {
+      alert("Lỗi cấu hình: Bạn chưa thiết lập GOOGLE_CLIENT_ID trong mã nguồn. Vui lòng cập nhật hằng số này trong file App.tsx bằng Client ID từ Google Cloud Console.");
+      return;
+    }
+
     if (!tokenClient.current) { 
-      alert("Dịch vụ Google chưa sẵn sàng. Vui lòng kiểm tra lại kết nối hoặc Client ID."); 
+      alert("Dịch vụ Google chưa sẵn sàng. Vui lòng đợi giây lát và thử lại."); 
       return; 
     }
     
@@ -237,7 +247,7 @@ const App: React.FC = () => {
         console.error("Auth error:", resp.error);
         setIsSyncing(false); 
         setSyncStatus('error'); 
-        alert("Lỗi xác thực Google: " + resp.error);
+        alert("Lỗi xác thực Google: " + JSON.stringify(resp.error));
         return; 
       }
       
@@ -255,24 +265,36 @@ const App: React.FC = () => {
           return;
         }
 
+        let successCount = 0;
         for (const item of itemsToSync) {
           const [h, m] = item.time.split(':').map(Number);
           const start = new Date(item.date); start.setHours(h, m, 0);
           const end = new Date(start); end.setHours(start.getHours() + 1);
           
-          await gapi.client.calendar.events.insert({
-            calendarId: 'primary',
-            resource: {
-              summary: `[LỊCH PHƯỜNG] ${item.description}`,
-              location: item.location,
-              description: `Công tác của: ${currentUser?.name} (${currentUser?.title})`,
-              start: { dateTime: start.toISOString(), timeZone: 'Asia/Ho_Chi_Minh' },
-              end: { dateTime: end.toISOString(), timeZone: 'Asia/Ho_Chi_Minh' },
-            }
-          });
+          try {
+            await gapi.client.calendar.events.insert({
+              calendarId: 'primary',
+              resource: {
+                summary: `[LỊCH PHƯỜNG] ${item.description}`,
+                location: item.location,
+                description: `Công tác của: ${currentUser?.name} (${currentUser?.title})`,
+                start: { dateTime: start.toISOString(), timeZone: 'Asia/Ho_Chi_Minh' },
+                end: { dateTime: end.toISOString(), timeZone: 'Asia/Ho_Chi_Minh' },
+              }
+            });
+            successCount++;
+          } catch (insertError: any) {
+            console.error("Error inserting item:", item.id, insertError);
+          }
         }
-        setSyncStatus('success');
-        alert("Đồng bộ thành công " + itemsToSync.length + " lịch lên Google Calendar!");
+        
+        if (successCount > 0) {
+          setSyncStatus('success');
+          alert(`Đã đồng bộ thành công ${successCount} sự kiện lên Google Calendar!`);
+        } else {
+          setSyncStatus('error');
+          alert("Không thể đồng bộ sự kiện nào. Vui lòng kiểm tra Console.");
+        }
       } catch (e: any) { 
         console.error("Sync execution error:", e);
         setSyncStatus('error');
