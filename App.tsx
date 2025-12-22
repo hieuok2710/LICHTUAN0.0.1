@@ -54,7 +54,10 @@ const App: React.FC = () => {
   const [globalNotificationsEnabled, setGlobalNotificationsEnabled] = useState(true);
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem(BANNER_KEY));
   const [currentUser, setCurrentUser] = useState<Official | null>(null);
-  const [selectedDate, setSelectedDate] = useState(new Date(2025, 11, 15));
+  
+  // CẬP NHẬT: Sử dụng new Date() để lấy ngày hiện tại của hệ thống làm mặc định
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  
   const [view, setView] = useState<'weekly' | 'personal'>('weekly');
   
   const [activePopup, setActivePopup] = useState<{item: WorkItem, official: Official, type: 'daily' | 'upcoming'} | null>(null);
