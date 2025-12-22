@@ -1,9 +1,9 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import { WorkItem, Official } from '../types';
 import { 
   X, Calendar, Clock, User, AlignLeft, MapPin, 
-  BellRing, Save
+  BellRing, Save, ChevronDown
 } from 'lucide-react';
 
 interface WorkItemFormModalProps {
@@ -19,6 +19,26 @@ interface WorkItemFormModalProps {
 const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
   isOpen, onClose, onSubmit, editingItem, officials, prefill, selectedDate
 }) => {
+  // Tạo danh sách giờ tinh gọn cho hành chính
+  const timeOptions = useMemo(() => {
+    const baseOptions = [
+      // Sáng: 07:00 -> 11:30
+      '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
+      // Chiều: 13:00 -> 17:00
+      '13:00', '13:30', '14:00', '14:30', '15:00', '15:30', '16:00', '16:30', '17:00', '17:30',
+      // Tối/Ngoài giờ
+      '18:00', '19:00', '20:00'
+    ];
+
+    // Nếu đang sửa một lịch có giờ đặc biệt (ví dụ 07:15) không nằm trong danh sách, tự động thêm vào
+    if (editingItem?.time && !baseOptions.includes(editingItem.time)) {
+      baseOptions.push(editingItem.time);
+      baseOptions.sort();
+    }
+
+    return baseOptions;
+  }, [editingItem]);
+
   if (!isOpen) return null;
 
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
@@ -28,10 +48,10 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
     
     const itemData: WorkItem = {
       id: editingItem ? editingItem.id : Math.random().toString(36).substr(2, 9),
-      day: 'Thứ Hai', // Sẽ được tính toán lại dựa trên date thực tế hoặc logic cha
+      day: 'Thứ Hai', // Sẽ được tính toán lại logic cha
       date: formData.get('date') as string, 
       time: time,
-      period: time.split(':')[0] < '12' ? 'Sáng' : 'Chiều',
+      period: parseInt(time.split(':')[0]) < 12 ? 'Sáng' : 'Chiều',
       description: formData.get('description') as string,
       location: formData.get('location') as string,
       officialId: formData.get('officialId') as string,
@@ -85,13 +105,21 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
                 <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                   <Clock size={12} className="text-red-500" /> Thời gian (24h)
                 </label>
-                <input 
-                  name="time" 
-                  type="time" 
-                  defaultValue={editingItem?.time || ''} 
-                  required 
-                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all shadow-inner-sm" 
-                />
+                <div className="relative">
+                  <select 
+                    name="time" 
+                    defaultValue={editingItem?.time || '07:30'} 
+                    required 
+                    className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all shadow-inner-sm appearance-none cursor-pointer" 
+                  >
+                    {timeOptions.map(t => (
+                      <option key={t} value={t}>
+                        {t} {parseInt(t.split(':')[0]) < 12 ? '(Sáng)' : '(Chiều)'}
+                      </option>
+                    ))}
+                  </select>
+                  <ChevronDown className="absolute right-4 top-4 text-slate-400 pointer-events-none" size={18} />
+                </div>
               </div>
             </div>
 
@@ -100,16 +128,19 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
               <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                 <User size={12} className="text-red-500" /> Người phụ trách chính
               </label>
-              <select 
-                name="officialId" 
-                defaultValue={editingItem?.officialId || prefill?.officialId || officials[0]?.id} 
-                className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all shadow-inner-sm appearance-none"
-              >
-                {officials.map(o => <option key={o.id} value={o.id}>{o.name} - {o.title}</option>)}
-              </select>
+              <div className="relative">
+                <select 
+                  name="officialId" 
+                  defaultValue={editingItem?.officialId || prefill?.officialId || officials[0]?.id} 
+                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all shadow-inner-sm appearance-none cursor-pointer"
+                >
+                  {officials.map(o => <option key={o.id} value={o.id}>{o.name} - {o.title}</option>)}
+                </select>
+                <ChevronDown className="absolute right-4 top-4 text-slate-400 pointer-events-none" size={18} />
+              </div>
             </div>
 
-            {/* Hàng 3: Địa điểm (Đã đưa ra ngoài) */}
+            {/* Hàng 3: Địa điểm */}
             <div className="space-y-1.5">
               <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                 <MapPin size={12} className="text-red-500" /> Địa điểm công tác
@@ -122,7 +153,7 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
                   className="w-full pl-10 pr-4 py-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none transition-all shadow-inner-sm" 
                   placeholder="Nhập địa điểm (HT UBND, Phòng họp...)" 
                 />
-                <MapPin className="absolute left-3.5 top-4 text-slate-400" size={18} />
+                <MapPin className="absolute left-3.5 top-4 text-slate-400 pointer-events-none" size={18} />
               </div>
             </div>
 
