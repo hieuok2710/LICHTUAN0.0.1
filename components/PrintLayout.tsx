@@ -5,7 +5,7 @@ import { WorkItem, Official, DayOfWeek } from '../types';
 interface PrintLayoutProps {
   schedule: WorkItem[];
   officials: Official[];
-  weekRange: { start: Date; end: Date };
+  weekRange: { start: Date; end: Date; startStr: string; endStr: string };
 }
 
 const DAYS: DayOfWeek[] = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
@@ -38,7 +38,7 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
       <div className="text-center mb-8">
         <h1 className="font-bold text-[18px] uppercase leading-tight">THÔNG BÁO</h1>
         <h2 className="font-bold text-[16px] mt-1">Chương trình công tác của Thường trực Đảng ủy</h2>
-        <p className="font-bold text-[16px] mt-2">(Từ ngày {weekRange.start.toLocaleDateString('vi-VN')} đến ngày {weekRange.end.toLocaleDateString('vi-VN')})</p>
+        <p className="font-bold text-[16px] mt-2">(Từ ngày {weekRange.startStr} đến ngày {weekRange.endStr})</p>
         <div className="flex justify-center mt-2">
           <div className="w-16 border-b-2 border-black"></div>
         </div>
@@ -59,7 +59,6 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
         <tbody>
           {DAYS.map((day, idx) => {
             const dateStr = getDayDate(idx);
-            // Áp dụng màu nền xen kẽ nhẹ cho bản in để dễ nhìn dòng
             const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
             
             return (
@@ -68,10 +67,11 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
                   {day}<br/>{dateStr}
                 </td>
                 {officials.map(official => {
+                  const cellDate = new Date(weekRange.start);
+                  cellDate.setDate(weekRange.start.getDate() + idx);
+                  const cellISO = cellDate.toISOString().split('T')[0];
+                  
                   const officialItems = schedule.filter(item => {
-                    const cellDate = new Date(weekRange.start);
-                    cellDate.setDate(weekRange.start.getDate() + idx);
-                    const cellISO = cellDate.toISOString().split('T')[0];
                     return item.date === cellISO && item.officialId === official.id;
                   }).sort((a, b) => a.time.localeCompare(b.time));
 

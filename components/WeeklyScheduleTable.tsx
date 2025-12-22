@@ -14,7 +14,6 @@ interface Props {
 
 const DAYS: DayOfWeek[] = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
 
-// Định nghĩa màu sắc cho từng ngày để dễ quan sát
 const DAY_COLORS: Record<number, string> = {
   0: 'bg-blue-50/60',    // Thứ Hai
   1: 'bg-emerald-50/60', // Thứ Ba
@@ -127,7 +126,7 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
         <tbody>
           {DAYS.map((day, index) => {
             const currentDate = weekDates[index];
-            const dateStr = currentDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
+            const dateDisplay = currentDate.toLocaleDateString('vi-VN', { day: '2-digit', month: '2-digit' });
             const fullDateISO = currentDate.toISOString().split('T')[0];
             const rowColorClass = DAY_COLORS[index] || 'bg-white';
             
@@ -135,7 +134,7 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
               <tr key={day} className={`${rowColorClass} hover:brightness-[0.97] transition-all`}>
                 <td className="p-4 border border-slate-200 text-center align-top sticky left-0 z-10 bg-inherit shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                   <span className="font-black text-slate-800 block text-base lg:text-lg">{day}</span>
-                  <span className="text-sm lg:text-base text-red-600 font-black block mt-1">{dateStr}</span>
+                  <span className="text-sm lg:text-base text-red-600 font-black block mt-1">{dateDisplay}</span>
                 </td>
                 {officials.map(official => {
                   const officialItems = groupedSchedule[fullDateISO]?.[official.id] || [];
