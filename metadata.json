@@ -1,5 +1,5 @@
 {
-  "name": "Hệ thống Quản lý Lịch Công tác v5 public",
+  "name": "Hệ thống Quản lý Lịch Công tác v0.0.6 public",
   "description": "Ứng dụng nhắc việc theo lịch tuần dành cho cán bộ, hỗ trợ quản lý và thông báo tự động theo từng cá nhân dựa trên mẫu lịch công tác hành chính.",
   "requestFramePermissions": [
     "microphone"

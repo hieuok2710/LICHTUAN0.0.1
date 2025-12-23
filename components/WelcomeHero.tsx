@@ -1,12 +1,15 @@
 
 import React from 'react';
 import { Shield, Clock, Bell, CheckCircle, ChevronDown, Calendar } from 'lucide-react';
+import { HeroConfig } from '../types';
+import { DEFAULT_HERO_CONFIG } from '../constants';
 
 interface WelcomeHeroProps {
   onDismiss: () => void;
+  config?: HeroConfig;
 }
 
-const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onDismiss }) => {
+const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onDismiss, config = DEFAULT_HERO_CONFIG }) => {
   return (
     <div className="relative overflow-hidden bg-slate-900 rounded-[32px] mb-8 shadow-2xl animate-popup-in">
       {/* Background patterns */}
@@ -17,31 +20,31 @@ const WelcomeHero: React.FC<WelcomeHeroProps> = ({ onDismiss }) => {
         <div className="flex-1 space-y-6">
           <div className="inline-flex items-center gap-2 px-3 py-1 bg-red-600/10 border border-red-500/20 rounded-full">
             <Shield size={14} className="text-red-500" />
-            <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">Hệ thống chính quy v5.0</span>
+            <span className="text-[10px] font-black text-red-500 uppercase tracking-widest">{config.systemLabel}</span>
           </div>
           
           <div className="space-y-2">
             <h1 className="text-3xl md:text-4xl lg:text-5xl font-black text-white leading-tight uppercase tracking-tighter">
-              Quản lý Lịch công tác <br />
-              <span className="text-red-500">Phường Long Phú</span>
+              {config.titleLine1} <br />
+              <span className="text-red-500">{config.titleLine2}</span>
             </h1>
             <p className="text-slate-400 text-sm md:text-base font-medium max-w-xl leading-relaxed">
-              Giải pháp tối ưu hóa quy trình sắp xếp, theo dõi và nhắc nhở lịch làm việc dành riêng cho Thường trực Đảng ủy và lãnh đạo UBND phường.
+              {config.subtitle}
             </p>
           </div>
 
           <div className="flex flex-wrap gap-4 pt-2">
             <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-2xl border border-white/10">
               <Clock size={16} className="text-blue-400" />
-              <span className="text-xs font-bold text-slate-300">Tự động nhắc lịch</span>
+              <span className="text-xs font-bold text-slate-300">{config.feature1}</span>
             </div>
             <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-2xl border border-white/10">
               <Calendar size={16} className="text-emerald-400" />
-              <span className="text-xs font-bold text-slate-300">Quản lý theo tuần</span>
+              <span className="text-xs font-bold text-slate-300">{config.feature2}</span>
             </div>
             <div className="flex items-center gap-2 bg-white/5 px-4 py-2 rounded-2xl border border-white/10">
               <CheckCircle size={16} className="text-orange-400" />
-              <span className="text-xs font-bold text-slate-300">Xuất file chuẩn ISO</span>
+              <span className="text-xs font-bold text-slate-300">{config.feature3}</span>
             </div>
           </div>
 

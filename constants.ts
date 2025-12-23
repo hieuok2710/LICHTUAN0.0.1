@@ -1,11 +1,21 @@
 
-import { Official, WorkItem } from './types';
+import { Official, WorkItem, HeroConfig } from './types';
 
 export const OFFICIALS: Official[] = [
   { id: '1', name: 'Đặng Văn Nê', title: 'Bí thư Đảng ủy - CT HĐND phường' },
   { id: '2', name: 'Trần Thị Hòa Bình', title: 'Phó Bí thư Thường trực đảng ủy' },
   { id: '3', name: 'Phan Hồng Khanh', title: 'Phó Bí thư - CT UBND phường' }
 ];
+
+export const DEFAULT_HERO_CONFIG: HeroConfig = {
+  systemLabel: 'Hệ thống chính quy v5.0',
+  titleLine1: 'Quản lý Lịch công tác',
+  titleLine2: 'Phường Long Phú',
+  subtitle: 'Giải pháp tối ưu hóa quy trình sắp xếp, theo dõi và nhắc nhở lịch làm việc dành riêng cho Thường trực Đảng ủy và lãnh đạo UBND phường.',
+  feature1: 'Tự động nhắc lịch',
+  feature2: 'Quản lý theo tuần',
+  feature3: 'Xuất file chuẩn ISO'
+};
 
 export const INITIAL_SCHEDULE: WorkItem[] = [
   // THỨ HAI 15/12/2025
