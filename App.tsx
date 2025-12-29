@@ -1,34 +1,23 @@
 
-import React, { useState, useEffect, useMemo, useRef } from 'react';
+import React, { useState, useEffect, useMemo } from 'react';
+import ReactDOM from 'react-dom/client';
 import { OFFICIALS as DEFAULT_OFFICIALS, INITIAL_SCHEDULE } from './constants';
-import { WorkItem, Official, TaskAlert, SystemState } from './types';
+import { WorkItem, Official, TaskAlert, SystemState, DayOfWeek } from './types';
 import WeeklyScheduleTable from './components/WeeklyScheduleTable';
 import ReminderPopup from './components/ReminderPopup';
-import NotificationCenter from './components/NotificationCenter';
 import PrintLayout from './components/PrintLayout';
 import ConfirmationModal from './components/ConfirmationModal';
 import OfficialSettingsModal from './components/OfficialSettingsModal';
 import WorkItemFormModal from './components/WorkItemFormModal';
 import WelcomeHero from './components/WelcomeHero';
 import { 
-  Bell, Calendar, Plus, User, Printer, Eye,
-  ChevronLeft, ChevronRight, CalendarDays, X, BellRing, FileDown, Info, Settings,
-  BellOff, MousePointer2, ArrowUp, RefreshCw, Layers, Globe, Check
+  Calendar, Plus, Printer, Eye, ChevronLeft, ChevronRight, X, Settings, FileText, DownloadCloud
 } from 'lucide-react';
 
 const STORAGE_KEY = 'LONG_PHU_WORK_SCHEDULE_STATE_V1_FIX';
 const BANNER_KEY = 'LONG_PHU_WELCOME_BANNER_SHOWN';
 
-// LƯU Ý QUAN TRỌNG: Bạn cần tạo OAuth 2.0 Client ID tại https://console.cloud.google.com/
-// 1. Tạo Project mới -> APIs & Services -> Credentials -> Create Credentials -> OAuth client ID
-// 2. Application type: Web application
-// 3. Authorized JavaScript origins: Thêm domain chạy app (ví dụ http://localhost:5173 hoặc domain vercel)
-// 4. Copy Client ID dán vào dưới đây:
-const GOOGLE_CLIENT_ID = "YOUR_GOOGLE_CLIENT_ID.apps.googleusercontent.com";
-const SCOPES = "https://www.googleapis.com/auth/calendar.events";
-
 const App: React.FC = () => {
-  // --- State & Storage ---
   const [officials, setOfficials] = useState<Official[]>(() => {
     const saved = localStorage.getItem(STORAGE_KEY);
     if (saved) {
@@ -51,33 +40,15 @@ const App: React.FC = () => {
     return INITIAL_SCHEDULE.map(i => ({ ...i, remind: true }));
   });
 
-  const [globalNotificationsEnabled, setGlobalNotificationsEnabled] = useState(true);
   const [showWelcome, setShowWelcome] = useState(() => !sessionStorage.getItem(BANNER_KEY));
-  const [currentUser, setCurrentUser] = useState<Official | null>(null);
-  
-  // CẬP NHẬT: Sử dụng new Date() để lấy ngày hiện tại của hệ thống làm mặc định
   const [selectedDate, setSelectedDate] = useState(new Date());
-  
-  const [view, setView] = useState<'weekly' | 'personal'>('weekly');
-  
-  const [activePopup, setActivePopup] = useState<{item: WorkItem, official: Official, type: 'daily' | 'upcoming'} | null>(null);
-  const [taskAlerts, setTaskAlerts] = useState<TaskAlert[]>([]);
-  const [showNotiCenter, setShowNotiCenter] = useState(false);
   const [showSettings, setShowSettings] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
   const [editingItem, setEditingItem] = useState<WorkItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<WorkItem | null>(null);
-  const [isSyncing, setIsSyncing] = useState(false);
-  const [syncStatus, setSyncStatus] = useState<'idle' | 'success' | 'error'>('idle');
-  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, visible: boolean }>({ x: 0, y: 0, visible: false });
   const [formPrefill, setFormPrefill] = useState<{date: string, officialId: string} | null>(null);
-  const [notifPermission, setNotifPermission] = useState('default');
-
-  const mainContentRef = useRef<HTMLDivElement>(null);
-  const tokenClient = useRef<any>(null);
-  const lastCheckedMinute = useRef<number>(-1);
-  const notifiedIds = useRef<Set<string>>(new Set());
+  const [contextMenu, setContextMenu] = useState<{ x: number, y: number, visible: boolean }>({ x: 0, y: 0, visible: false });
 
   const weekRange = useMemo(() => {
     const start = new Date(selectedDate);
@@ -89,266 +60,133 @@ const App: React.FC = () => {
     end.setDate(start.getDate() + 6);
     end.setHours(23, 59, 59, 999);
     return { 
-      start, 
-      end,
+      start, end,
       startStr: start.toLocaleDateString('vi-VN'),
       endStr: end.toLocaleDateString('vi-VN')
     };
   }, [selectedDate]);
 
-  // --- Google API Initialization ---
+  // Lưu trữ dữ liệu
   useEffect(() => {
-    const initGis = () => {
-      const google = (window as any).google;
-      if (google && google.accounts) {
-        tokenClient.current = google.accounts.oauth2.initTokenClient({
-          client_id: GOOGLE_CLIENT_ID,
-          scope: SCOPES,
-          callback: '', // Sẽ được gán động khi gọi sync
-        });
-      }
+    const state: SystemState = {
+      version: '1.0',
+      timestamp: Date.now(),
+      officials,
+      schedule
     };
-
-    const initGapi = () => {
-      const gapi = (window as any).gapi;
-      if (gapi) {
-        gapi.load('client', async () => {
-          try {
-            // KHẮC PHỤC LỖI: Không truyền apiKey vào gapi.client.init nếu không chắc chắn key hợp lệ cho Calendar API.
-            // Chúng ta sẽ dựa vào OAuth2 Access Token để xác thực và gọi API.
-            await gapi.client.init({
-              discoveryDocs: ["https://www.googleapis.com/discovery/v1/apis/calendar/v3/rest"],
-            });
-            console.log("GAPI client initialized success");
-          } catch (e: any) { 
-            const errorMsg = e?.message || (typeof e === 'object' ? JSON.stringify(e) : String(e));
-            console.error("Gapi init error:", errorMsg); 
-          }
-        });
-      }
-    };
-
-    // Kiểm tra định kỳ cho đến khi script Google được tải xong
-    const checkGoogleScripts = setInterval(() => {
-      if ((window as any).gapi && (window as any).google) {
-        initGapi();
-        initGis();
-        clearInterval(checkGoogleScripts);
-      }
-    }, 500);
-
-    if (typeof window !== 'undefined' && (window as any).Notification) {
-      setNotifPermission((window as any).Notification.permission);
-    }
-
-    return () => clearInterval(checkGoogleScripts);
-  }, []);
-
-  useEffect(() => {
-    if (!currentUser && officials.length > 0) setCurrentUser(officials[0]);
-  }, [officials, currentUser]);
-
-  useEffect(() => {
-    const state: SystemState = { version: '1.4', timestamp: Date.now(), officials, schedule };
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [officials, schedule]);
 
-  // Nhắc việc
-  useEffect(() => {
-    const interval = setInterval(() => {
-      if (!currentUser || !globalNotificationsEnabled) return;
-      const now = new Date();
-      if (lastCheckedMinute.current === now.getMinutes()) return;
-      lastCheckedMinute.current = now.getMinutes();
-      const todayISO = now.toISOString().split('T')[0];
+  const handlePrint = () => {
+    // 1. Render PrintLayout vào wrapper ẩn để in
+    const wrapper = document.getElementById('print-document-wrapper');
+    if (wrapper) {
+      const root = ReactDOM.createRoot(wrapper);
+      root.render(<PrintLayout schedule={schedule} officials={officials} weekRange={weekRange} />);
       
-      if (now.getHours() === 7 && now.getMinutes() === 0) {
-        const todays = schedule.filter(i => i.date === todayISO && i.officialId === currentUser.id);
-        if (todays.length > 0 && !notifiedIds.current.has(`daily-${todayISO}`)) {
-          setActivePopup({ item: todays[0], official: currentUser, type: 'daily' });
-          notifiedIds.current.add(`daily-${todayISO}`);
-        }
-      }
-
-      schedule.forEach(item => {
-        if (item.officialId !== currentUser.id || item.date !== todayISO || !item.remind) return;
-        const [h, m] = item.time.split(':').map(Number);
-        const itemTime = new Date(now.getFullYear(), now.getMonth(), now.getDate(), h, m);
-        const diff = Math.floor((itemTime.getTime() - now.getTime()) / 60000);
-        
-        if (diff === 60 && !notifiedIds.current.has(`remind-${item.id}`)) {
-          setActivePopup({ item, official: currentUser, type: 'upcoming' });
-          setTaskAlerts(prev => [{
-            id: Math.random().toString(36).substr(2, 9),
-            timestamp: Date.now(),
-            message: `Sắp đến giờ: ${item.description}`,
-            type: 'urgent',
-            officialId: currentUser.id,
-            read: false,
-            relatedItemId: item.id
-          }, ...prev]);
-          notifiedIds.current.add(`remind-${item.id}`);
-        }
-      });
-    }, 30000);
-    return () => clearInterval(interval);
-  }, [schedule, currentUser, globalNotificationsEnabled]);
-
-  useEffect(() => {
-    const hideMenu = () => setContextMenu(prev => ({ ...prev, visible: false }));
-    window.addEventListener('click', hideMenu);
-    window.addEventListener('scroll', hideMenu);
-    return () => {
-      window.removeEventListener('click', hideMenu);
-      window.removeEventListener('scroll', hideMenu);
-    };
-  }, []);
-
-  // --- Handlers ---
-  const handleBackup = () => {
-    const data = JSON.stringify({ version: '1.4', officials, schedule }, null, 2);
-    const blob = new Blob([data], { type: 'application/json' });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement('a');
-    a.href = url;
-    a.download = `Lich_PhuongLongPhu_${new Date().toLocaleDateString('vi-VN').replace(/\//g, '-')}.json`;
-    a.click();
-  };
-
-  const handleRestore = (file: File) => {
-    const reader = new FileReader();
-    reader.onload = (e) => {
-      try {
-        const data = JSON.parse(e.target?.result as string);
-        if (Array.isArray(data.officials) && Array.isArray(data.schedule)) {
-          setOfficials(data.officials);
-          setSchedule(data.schedule);
-          alert("Khôi phục dữ liệu thành công!");
-          setShowSettings(false);
-        }
-      } catch (err) { alert("File không hợp lệ."); }
-    };
-    reader.readAsText(file);
-  };
-
-  const handleSyncToGoogle = async () => {
-    if (GOOGLE_CLIENT_ID.includes("YOUR_GOOGLE_CLIENT_ID")) {
-      alert("Lỗi cấu hình: Bạn chưa thiết lập GOOGLE_CLIENT_ID trong mã nguồn. Vui lòng cập nhật hằng số này trong file App.tsx bằng Client ID từ Google Cloud Console.");
-      return;
-    }
-
-    if (!tokenClient.current) { 
-      alert("Dịch vụ Google chưa sẵn sàng. Vui lòng đợi giây lát và thử lại."); 
-      return; 
-    }
-    
-    setIsSyncing(true);
-    setSyncStatus('idle');
-
-    tokenClient.current.callback = async (resp: any) => {
-      if (resp.error) { 
-        console.error("Auth error:", resp.error);
-        setIsSyncing(false); 
-        setSyncStatus('error'); 
-        alert("Lỗi xác thực Google: " + JSON.stringify(resp.error));
-        return; 
-      }
-      
-      try {
-        const gapi = (window as any).gapi;
-        const itemsToSync = schedule.filter(i => 
-          i.officialId === currentUser?.id && 
-          i.date >= weekRange.start.toISOString().split('T')[0] && 
-          i.date <= weekRange.end.toISOString().split('T')[0]
-        );
-
-        if (itemsToSync.length === 0) {
-          alert("Không có lịch cá nhân nào trong tuần này để đồng bộ.");
-          setIsSyncing(false);
-          return;
-        }
-
-        let successCount = 0;
-        for (const item of itemsToSync) {
-          const [h, m] = item.time.split(':').map(Number);
-          const start = new Date(item.date); start.setHours(h, m, 0);
-          const end = new Date(start); end.setHours(start.getHours() + 1);
-          
-          try {
-            await gapi.client.calendar.events.insert({
-              calendarId: 'primary',
-              resource: {
-                summary: `[LỊCH PHƯỜNG] ${item.description}`,
-                location: item.location,
-                description: `Công tác của: ${currentUser?.name} (${currentUser?.title})`,
-                start: { dateTime: start.toISOString(), timeZone: 'Asia/Ho_Chi_Minh' },
-                end: { dateTime: end.toISOString(), timeZone: 'Asia/Ho_Chi_Minh' },
-              }
-            });
-            successCount++;
-          } catch (insertError: any) {
-            console.error("Error inserting item:", item.id, insertError);
-          }
-        }
-        
-        if (successCount > 0) {
-          setSyncStatus('success');
-          alert(`Đã đồng bộ thành công ${successCount} sự kiện lên Google Calendar!`);
-        } else {
-          setSyncStatus('error');
-          alert("Không thể đồng bộ sự kiện nào. Vui lòng kiểm tra Console.");
-        }
-      } catch (e: any) { 
-        console.error("Sync execution error:", e);
-        setSyncStatus('error');
-        const errorMsg = e?.result?.error?.message || e?.message || "Lỗi không xác định";
-        alert("Lỗi khi đồng bộ: " + errorMsg);
-      }
-      setIsSyncing(false);
-      setTimeout(() => setSyncStatus('idle'), 3000);
-    };
-
-    try {
-      if ((window as any).gapi.client.getToken() === null) {
-        tokenClient.current.requestAccessToken({ prompt: 'consent' });
-      } else {
-        tokenClient.current.requestAccessToken({ prompt: '' });
-      }
-    } catch (err: any) {
-      console.error("Request token error:", err);
-      setIsSyncing(false);
-      setSyncStatus('error');
-    }
-  };
-
-  const handleExportPDF = () => {
-    const win = window.open('', '_blank');
-    const printContent = document.getElementById('print-document')?.innerHTML;
-    if (win && printContent) {
-      win.document.write(`
-        <html>
-          <head>
-            <title>Lịch Công Tác Phường Long Phú</title>
-            <style>
-              body { font-family: 'Times New Roman', serif; padding: 20px; }
-              table { width: 100%; border-collapse: collapse; margin-top: 10px; }
-              th, td { border: 1px solid black; padding: 8px; font-size: 13px; text-align: justify; vertical-align: top; }
-              th { background-color: #f2f2f2; text-align: center; }
-              .header { display: flex; justify-content: space-between; margin-bottom: 20px; }
-              .title { text-align: center; margin-bottom: 20px; }
-              .title h1 { font-size: 18px; text-transform: uppercase; margin: 0; }
-            </style>
-          </head>
-          <body>${printContent}</body>
-        </html>
-      `);
-      win.document.close();
-      win.focus();
+      // 2. Kích hoạt lệnh in hệ thống sau khi render
       setTimeout(() => {
-        win.print();
-        win.close();
+        window.print();
+        // Xóa sau khi in
+        setTimeout(() => wrapper.innerHTML = '', 1000);
       }, 500);
     }
+  };
+
+  const handleExportDocx = () => {
+    const dateNow = new Date();
+    const dateStr = `${dateNow.getDate()} tháng ${dateNow.getMonth() + 1} năm ${dateNow.getFullYear()}`;
+    
+    // Header & Styles for Word 2016+
+    const css = `
+      <style>
+        @page WordSection1 { size: 595.3pt 841.9pt; margin: 56.7pt 42.5pt 56.7pt 85.05pt; }
+        div.WordSection1 { page: WordSection1; }
+        table { border-collapse: collapse; width: 100%; border: 1px solid black; }
+        th, td { border: 1px solid black; padding: 5pt; font-family: "Times New Roman", serif; font-size: 11pt; }
+        .text-center { text-align: center; }
+        .font-bold { font-weight: bold; }
+        .uppercase { text-transform: uppercase; }
+      </style>
+    `;
+
+    const htmlContent = `
+      <div class="WordSection1">
+        <table border="0" style="border:none; width:100%;">
+          <tr>
+            <td style="border:none; width:45%; text-align:center;">
+              <p class="uppercase">ĐẢNG ỦY PHƯỜNG LONG PHÚ</p>
+              <p class="font-bold uppercase" style="text-decoration: underline;">VĂN PHÒNG</p>
+            </td>
+            <td style="border:none; text-align:center;">
+              <p class="font-bold uppercase">ĐẢNG CỘNG SẢN VIỆT NAM</p>
+              <p style="font-style:italic;">Long Phú, ngày ${dateStr}</p>
+            </td>
+          </tr>
+        </table>
+
+        <div class="text-center" style="margin-top:20pt; margin-bottom:20pt;">
+          <p class="font-bold" style="font-size:14pt; text-transform:uppercase;">THÔNG BÁO</p>
+          <p class="font-bold" style="font-size:13pt; text-transform:uppercase;">Chương trình công tác của Thường trực Đảng ủy</p>
+          <p class="font-bold" style="font-size:13pt;">(Từ ngày ${weekRange.startStr} đến ngày ${weekRange.endStr})</p>
+        </div>
+
+        <table>
+          <tr style="background-color:#f3f3f3;">
+            <th style="width:10%;">Thứ/Ngày</th>
+            ${officials.map(o => `<th>${o.title.toUpperCase()}<br/>Đ/c ${o.name}</th>`).join('')}
+          </tr>
+          ${['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'].map((day, idx) => {
+            const d = new Date(weekRange.start);
+            d.setDate(weekRange.start.getDate() + idx);
+            const cellISO = d.toISOString().split('T')[0];
+            const dateStrCol = d.toLocaleDateString('vi-VN');
+            
+            return `
+              <tr>
+                <td class="text-center font-bold">${day}<br/>${dateStrCol}</td>
+                ${officials.map(off => {
+                  const items = schedule.filter(i => i.date === cellISO && i.officialId === off.id).sort((a,b) => a.time.localeCompare(b.time));
+                  return `
+                    <td style="vertical-align:top; text-align:justify;">
+                      ${items.length > 0 ? items.map(item => `<div>- <b>${item.time}:</b> ${item.description} <b>(${item.location})</b></div>`).join('') : '<i style="color:#999;">- Làm việc thường xuyên</i>'}
+                    </td>
+                  `;
+                }).join('')}
+              </tr>
+            `;
+          }).join('')}
+        </table>
+
+        <table border="0" style="border:none; width:100%; margin-top:30pt;">
+          <tr>
+            <td style="border:none; width:50%;">
+              <p class="font-bold" style="text-decoration:underline; font-style:italic;">Nơi nhận:</p>
+              <p>- Thường trực Đảng ủy;</p>
+              <p>- Lưu Văn phòng.</p>
+            </td>
+            <td style="border:none; text-align:center;">
+              <p class="font-bold uppercase">CHÁNH VĂN PHÒNG</p>
+              <br/><br/><br/><br/>
+              <p class="font-bold">Nguyễn Thế Anh</p>
+            </td>
+          </tr>
+        </table>
+      </div>
+    `;
+
+    const fullDoc = `
+      <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
+      <head><meta charset='utf-8'>${css}</head>
+      <body>${htmlContent}</body></html>
+    `;
+
+    const blob = new Blob(['\ufeff', fullDoc], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement('a');
+    link.href = url;
+    link.download = `Lich_Cong_Tac_${weekRange.startStr.replace(/\//g, '-')}.docx`;
+    link.click();
   };
 
   const changeWeek = (offset: number) => {
@@ -360,55 +198,32 @@ const App: React.FC = () => {
   };
 
   return (
-    <div 
-      className="min-h-screen bg-slate-100 pb-20 selection:bg-red-100 selection:text-red-900" 
-      onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, visible: true }); }}
-    >
-      {/* Context Menu */}
+    <div className="min-h-screen bg-slate-100 pb-20" onClick={() => setContextMenu(prev => ({...prev, visible: false}))} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, visible: true }); }}>
+      
+      {/* Quick Menu */}
       {contextMenu.visible && (
-        <div 
-          className="fixed z-[999] bg-white/95 backdrop-blur-2xl border border-slate-200 shadow-2xl rounded-3xl py-2.5 min-w-[260px] animate-popup-in ring-1 ring-black/5" 
-          style={{ top: Math.min(contextMenu.y, window.innerHeight - 300), left: Math.min(contextMenu.x, window.innerWidth - 280) }}
-        >
-          <div className="px-5 py-2.5 flex items-center gap-3 border-b border-slate-100 mb-1.5">
-            <MousePointer2 size={16} className="text-red-600" />
-            <span className="text-xs font-bold text-slate-800">Menu Nhanh</span>
-          </div>
-          <div className="px-2 space-y-0.5">
-            <button onClick={() => { setShowPreviewModal(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-red-50 hover:text-red-700 rounded-xl transition-all text-sm font-bold"><Eye size={18} /> Xem trước / In PDF</button>
-            <button onClick={handleSyncToGoogle} className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all text-sm font-bold"><Globe size={18} /> Đồng bộ Google Calendar</button>
-            <button onClick={() => { setEditingItem(null); setFormPrefill(null); setIsFormOpen(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-blue-50 hover:text-blue-700 rounded-xl transition-all text-sm font-bold"><Plus size={18} /> Thêm lịch mới</button>
-            <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-3 px-4 py-2.5 text-slate-700 hover:bg-slate-50 rounded-xl transition-all text-sm font-bold"><Settings size={18} /> Cấu hình hệ thống</button>
-          </div>
+        <div className="fixed z-[999] bg-white border shadow-2xl rounded-2xl py-2 min-w-[240px] animate-popup-in" style={{ top: Math.min(contextMenu.y, window.innerHeight - 250), left: Math.min(contextMenu.x, window.innerWidth - 250) }}>
+           <button onClick={() => { setShowPreviewModal(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm font-bold text-slate-700"><Eye size={18} /> Xem trước & In ấn</button>
+           <button onClick={handleExportDocx} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-sm font-bold text-slate-700"><FileText size={18} /> Xuất Word (.docx)</button>
+           <hr className="my-1 border-slate-100" />
+           <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-sm font-bold text-slate-700"><Settings size={18} /> Cấu hình hệ thống</button>
         </div>
       )}
 
-      {/* Main UI */}
-      <header className="bg-white border-b border-slate-200 sticky top-0 z-40 shadow-sm h-16 no-print">
+      <header className="bg-white border-b sticky top-0 z-40 shadow-sm h-16 no-print">
         <div className="max-w-7xl mx-auto px-4 h-full flex justify-between items-center">
           <div className="flex items-center gap-3">
-            <div className="bg-red-600 text-white p-2 rounded-lg shadow-lg"><Calendar size={22} /></div>
-            <h1 className="text-lg font-black text-slate-900 uppercase hidden sm:block">Phường Long Phú</h1>
+            <div className="bg-red-600 text-white p-2 rounded-lg"><Calendar size={22} /></div>
+            <h1 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Long Phú Admin</h1>
           </div>
-          
-          <div className="flex items-center gap-2">
-            <button disabled={isSyncing} onClick={handleSyncToGoogle} className={`hidden md:flex items-center gap-2 px-3 py-1.5 rounded-lg text-[10px] font-black border transition-all ${syncStatus === 'success' ? 'bg-green-50 text-green-700 border-green-200' : 'bg-white text-blue-700 border-blue-200'}`}>
-              {isSyncing ? <RefreshCw size={14} className="animate-spin" /> : syncStatus === 'success' ? <Check size={14} /> : <Globe size={14} />}
-              {isSyncing ? 'SYNCING...' : syncStatus === 'success' ? 'ĐÃ ĐỒNG BỘ' : 'SYNC GOOGLE'}
+          <div className="flex items-center gap-3">
+            <button onClick={handleExportDocx} className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-[11px] font-black uppercase hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
+              <DownloadCloud size={16} /> Tải .DOCX
             </button>
-            
-            <div className="flex items-center gap-2 bg-slate-50 rounded-full px-3 py-1 border border-slate-200">
-              <User size={14} className="text-slate-400" />
-              <select className="text-[11px] bg-transparent border-none font-bold outline-none cursor-pointer" onChange={(e) => setCurrentUser(officials.find(o => o.id === e.target.value) || null)} value={currentUser?.id || ''}>
-                {officials.map(o => <option key={o.id} value={o.id}>{o.name}</option>)}
-              </select>
-            </div>
-
-            <button onClick={() => setShowNotiCenter(!showNotiCenter)} className="relative p-2 text-slate-500 hover:text-red-600">
-              <Bell size={20} className={taskAlerts.some(n => !n.read && n.officialId === currentUser?.id) ? 'animate-pulse text-red-600' : ''} />
-              {taskAlerts.filter(n => !n.read && n.officialId === currentUser?.id).length > 0 && <span className="absolute top-1 right-1 w-4 h-4 bg-red-600 text-white text-[9px] font-black rounded-full flex items-center justify-center">{taskAlerts.filter(n => !n.read && n.officialId === currentUser?.id).length}</span>}
+            <button onClick={handlePrint} className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase hover:bg-black shadow-lg shadow-slate-200 transition-all">
+              <Printer size={16} /> In nhanh (PDF)
             </button>
-            <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-blue-600"><Settings size={20} /></button>
+            <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-red-600"><Settings size={20} /></button>
           </div>
         </div>
       </header>
@@ -416,38 +231,21 @@ const App: React.FC = () => {
       <main className="max-w-[1600px] mx-auto px-4 py-8 no-print">
         {showWelcome && <WelcomeHero onDismiss={() => { setShowWelcome(false); sessionStorage.setItem(BANNER_KEY, 'true'); }} />}
         
-        <div ref={mainContentRef} className="bg-white p-4 rounded-xl border border-slate-200 shadow-sm mb-6 flex items-center justify-between flex-wrap gap-4">
+        <div className="bg-white p-4 rounded-2xl border shadow-sm mb-6 flex items-center justify-between flex-wrap gap-4">
           <div className="flex items-center gap-2">
-            <button onClick={() => changeWeek(-7)} className="p-2 hover:bg-slate-50 rounded-lg"><ChevronLeft size={20}/></button>
-            <div className="px-4 py-2 bg-slate-50 rounded-lg border font-bold flex items-center gap-3 text-sm">
-              <CalendarDays size={18} className="text-red-600" />
-              Tuần: {weekRange.startStr} - {weekRange.endStr}
+            <button onClick={() => changeWeek(-7)} className="p-2 hover:bg-slate-50 rounded-lg transition-colors"><ChevronLeft size={24}/></button>
+            <div className="px-6 py-2.5 bg-slate-50 rounded-xl border-2 border-slate-100 font-black text-sm tracking-tight text-slate-700">
+              TUẦN: {weekRange.startStr} — {weekRange.endStr}
             </div>
-            <button onClick={() => changeWeek(7)} className="p-2 hover:bg-slate-50 rounded-lg"><ChevronRight size={20}/></button>
+            <button onClick={() => changeWeek(7)} className="p-2 hover:bg-slate-50 rounded-lg transition-colors"><ChevronRight size={24}/></button>
           </div>
-          <div className="flex items-center gap-3">
-            <div className="flex bg-slate-100 p-1 rounded-lg border border-slate-200">
-              <button onClick={() => setView('weekly')} className={`px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all ${view === 'weekly' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500'}`}>Toàn bộ</button>
-              <button onClick={() => setView('personal')} className={`px-4 py-1.5 rounded-md text-[10px] font-black uppercase transition-all ${view === 'personal' ? 'bg-white text-red-600 shadow-sm' : 'text-slate-500'}`}>Cá nhân</button>
-            </div>
-            <button onClick={() => { setEditingItem(null); setFormPrefill(null); setIsFormOpen(true); }} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2 rounded-lg text-xs font-black hover:bg-red-700 shadow-lg shadow-red-100 transition-all"><Plus size={16} />THÊM LỊCH</button>
-          </div>
+          <button onClick={() => { setEditingItem(null); setIsFormOpen(true); }} className="bg-red-600 text-white px-8 py-3 rounded-2xl text-xs font-black shadow-xl shadow-red-200 hover:bg-red-700 transition-all flex items-center gap-2 uppercase tracking-widest"><Plus size={18} /> Thêm công tác mới</button>
         </div>
 
-        <div className="bg-white p-6 md:p-10 rounded-2xl border shadow-xl overflow-hidden relative">
-          <div className="absolute top-0 left-0 w-full h-1.5 bg-red-600"></div>
-          <div className="text-center mb-10 border-b pb-8">
-            <h2 className="text-3xl font-black text-red-700 uppercase tracking-tighter">THÔNG BÁO</h2>
-            <h3 className="text-xl font-bold text-slate-800 mt-1">Chương trình công tác của Thường trực Đảng ủy</h3>
-            <div className="mt-4 text-slate-700 font-black text-[15px] bg-red-50 px-8 py-2.5 rounded-full border border-red-100 inline-block">
-              (Từ {weekRange.startStr} đến {weekRange.endStr})
-            </div>
-          </div>
-          
+        <div className="bg-white p-1 rounded-3xl border shadow-2xl relative overflow-hidden">
+          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-600 to-orange-500"></div>
           <WeeklyScheduleTable 
-            schedule={view === 'personal' && currentUser ? schedule.filter(i => i.officialId === currentUser.id) : schedule} 
-            officials={officials} 
-            selectedDate={selectedDate} 
+            schedule={schedule} officials={officials} selectedDate={selectedDate} 
             onEdit={(item) => { setEditingItem(item); setIsFormOpen(true); }} 
             onDeleteRequest={setItemToDelete} 
             onAddAt={(date, officialId) => { setEditingItem(null); setFormPrefill({ date, officialId }); setIsFormOpen(true); }} 
@@ -455,38 +253,35 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* Hidden Print Content */}
-      <div id="print-document-wrapper">
-        <PrintLayout schedule={schedule} weekRange={weekRange} officials={officials} />
-      </div>
-
-      {/* Modals */}
-      {showNotiCenter && <NotificationCenter notifications={taskAlerts.filter(n => n.officialId === currentUser?.id)} onClose={() => setShowNotiCenter(false)} onMarkRead={(id) => setTaskAlerts(prev => prev.map(n => n.id === id ? { ...n, read: true } : n))} onClearAll={() => setTaskAlerts([])} notifPermission={notifPermission} onRequestPermission={() => {}} />}
-      {showSettings && <OfficialSettingsModal officials={officials} onUpdateOfficials={setOfficials} onBackup={handleBackup} onRestore={handleRestore} onClose={() => setShowSettings(false)} />}
-      <ConfirmationModal isOpen={!!itemToDelete} message="Bạn có chắc chắn muốn xóa mục lịch này?" onConfirm={() => { setSchedule(prev => prev.filter(i => i.id !== itemToDelete?.id)); setItemToDelete(null); }} onCancel={() => setItemToDelete(null)} />
-      
+      {/* Preview Modal */}
       {showPreviewModal && (
-        <div className="fixed inset-0 bg-slate-900/95 backdrop-blur-md z-[60] flex items-center justify-center p-4 no-print">
-          <div className="bg-white rounded-3xl shadow-2xl max-w-[95vw] w-[1100px] max-h-[95vh] flex flex-col border overflow-hidden animate-popup-in">
-            <div className="p-4 border-b flex justify-between items-center bg-slate-50">
-              <span className="text-xs font-black text-slate-800 uppercase">Xem trước bản in công tác</span>
-              <div className="flex items-center gap-3">
-                <button onClick={handleExportPDF} className="flex items-center gap-2 bg-red-600 text-white px-5 py-2.5 rounded-xl text-xs font-black shadow-lg shadow-red-100"><Printer size={16} />XUẤT PDF / IN</button>
-                <button onClick={() => setShowPreviewModal(false)} className="p-2 text-slate-400 hover:text-slate-600 transition-all"><X size={24} /></button>
+        <div className="fixed inset-0 bg-slate-900/95 z-[60] flex items-center justify-center p-4">
+          <div className="bg-white rounded-[40px] w-full max-w-6xl h-[92vh] flex flex-col overflow-hidden animate-popup-in shadow-2xl">
+            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+              <div className="flex items-center gap-4">
+                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center"><Printer size={24} /></div>
+                <div>
+                   <h2 className="font-black text-lg uppercase tracking-tight">Xem trước bản in công tác</h2>
+                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Định dạng A4 - Tiêu chuẩn Nghị định 30</p>
+                </div>
+              </div>
+              <div className="flex gap-3">
+                <button onClick={handleExportDocx} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"><FileText size={18} /> Tải .DOCX</button>
+                <button onClick={handlePrint} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-300"><Printer size={18} /> In ngay (PDF)</button>
+                <button onClick={() => setShowPreviewModal(false)} className="ml-4 p-3 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full transition-all"><X size={24} /></button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-8 bg-slate-100/50 flex flex-col items-center">
-              <div className="bg-white shadow-2xl w-full min-w-[900px] p-12 ring-1 ring-slate-300">
-                 <PrintLayout schedule={schedule} weekRange={weekRange} officials={officials} />
+            <div className="flex-1 overflow-y-auto p-12 bg-slate-200/50 flex justify-center custom-scrollbar">
+              <div className="bg-white p-[20mm] shadow-2xl w-[210mm] min-h-[297mm] ring-1 ring-slate-300">
+                <PrintLayout schedule={schedule} weekRange={weekRange} officials={officials} />
               </div>
             </div>
           </div>
         </div>
       )}
 
-      <WorkItemFormModal 
-        isOpen={isFormOpen} 
-        onClose={() => {setIsFormOpen(false); setEditingItem(null); setFormPrefill(null);}} 
+      {/* Forms & Popups */}
+      <WorkItemFormModal isOpen={isFormOpen} onClose={() => {setIsFormOpen(false); setEditingItem(null); setFormPrefill(null);}} 
         onSubmit={(item) => { 
           if (editingItem) setSchedule(prev => prev.map(i => i.id === editingItem.id ? item : i));
           else setSchedule(prev => [...prev, item]);
@@ -494,7 +289,8 @@ const App: React.FC = () => {
         }} 
         editingItem={editingItem} officials={officials} prefill={formPrefill} selectedDate={selectedDate} 
       />
-      {activePopup && <ReminderPopup item={activePopup.item} official={activePopup.official} type={activePopup.type} onClose={() => setActivePopup(null)} />}
+      <ConfirmationModal isOpen={!!itemToDelete} message="Bạn có chắc xóa mục lịch này khỏi hệ thống?" onConfirm={() => { setSchedule(prev => prev.filter(i => i.id !== itemToDelete?.id)); setItemToDelete(null); }} onCancel={() => setItemToDelete(null)} />
+      {showSettings && <OfficialSettingsModal officials={officials} onUpdateOfficials={setOfficials} onBackup={() => {}} onRestore={() => {}} onClose={() => setShowSettings(false)} />}
     </div>
   );
 };

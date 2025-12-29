@@ -18,40 +18,40 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
   };
 
   return (
-    <div id="print-document" className="bg-white text-black p-[5mm] mx-auto print:p-0" style={{ width: '100%', maxWidth: '277mm' }}>
-      {/* Header Section */}
-      <div className="flex justify-between items-start mb-6">
-        <div className="text-center w-[40%]">
-          <p className="font-normal text-[14px] uppercase tracking-tighter">ĐẢNG ỦY PHƯỜNG LONG PHÚ</p>
-          <p className="font-bold text-[14px] uppercase inline-block px-4 pb-0.5">VĂN PHÒNG</p>
-          <p className="mt-0.5 text-[10px]">*</p>
+    <div id="print-document" className="bg-white text-black font-['Tinos','Times_New_Roman',serif]">
+      {/* Quốc hiệu & Tiêu ngữ */}
+      <div className="flex justify-between items-start mb-4">
+        <div className="text-center w-[45%]">
+          <p className="font-normal text-[13pt] uppercase leading-tight tracking-tighter">ĐẢNG ỦY PHƯỜNG LONG PHÚ</p>
+          <p className="font-bold text-[13pt] uppercase leading-tight border-b border-black inline-block px-4 pb-0.5">VĂN PHÒNG</p>
+          <p className="mt-1 text-[11pt] italic">Số: .....-TB/VP</p>
         </div>
         <div className="text-center w-[50%]">
-          <p className="font-bold text-[14px] uppercase tracking-tight underline underline-offset-2">ĐẢNG CỘNG SẢN VIỆT NAM</p>
-          <p className="mt-2 text-[12px] italic">
-            Long Phú, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}
-          </p>
+          <p className="font-bold text-[12pt] uppercase leading-tight">ĐẢNG CỘNG SẢN VIỆT NAM</p>
+          <div className="flex flex-col items-center mt-1">
+            <p className="text-[12pt] italic leading-tight">Long Phú, ngày {new Date().getDate()} tháng {new Date().getMonth() + 1} năm {new Date().getFullYear()}</p>
+          </div>
         </div>
       </div>
 
-      {/* Title Section */}
-      <div className="text-center mb-8">
-        <h1 className="font-bold text-[18px] uppercase leading-tight">THÔNG BÁO</h1>
-        <h2 className="font-bold text-[16px] mt-1">Chương trình công tác của Thường trực Đảng ủy</h2>
-        <p className="font-bold text-[16px] mt-2">(Từ ngày {weekRange.startStr} đến ngày {weekRange.endStr})</p>
+      {/* Tên văn bản */}
+      <div className="text-center mb-6 mt-8">
+        <h1 className="font-bold text-[14pt] uppercase leading-tight">THÔNG BÁO</h1>
+        <h2 className="font-bold text-[13pt] mt-1 leading-tight uppercase">Chương trình công tác của Thường trực Đảng ủy</h2>
+        <p className="font-bold text-[13pt] mt-1">(Từ ngày {weekRange.startStr} đến ngày {weekRange.endStr})</p>
         <div className="flex justify-center mt-2">
-          <div className="w-16 border-b-2 border-black"></div>
+          <div className="w-24 border-b border-black"></div>
         </div>
       </div>
 
-      {/* Main Table */}
-      <table className="w-full border-collapse border border-black text-[12px] table-fixed">
+      {/* Bảng dữ liệu */}
+      <table className="w-full border-collapse border-[1.5pt] border-black text-[11pt]">
         <thead>
-          <tr className="bg-gray-100">
-            <th className="border border-black p-2 w-[10%] text-center font-bold">Thứ/<br/>Ngày</th>
+          <tr className="bg-gray-50">
+            <th className="border border-black p-2 w-[12%] text-center font-bold">Thứ/ Ngày</th>
             {officials.map(off => (
-              <th key={off.id} className="border border-black p-2 text-center font-bold">
-                {off.title}<br/>Đ/c {off.name}
+              <th key={off.id} className="border border-black p-2 text-center font-bold uppercase">
+                {off.title}<br/><span className="capitalize font-bold">Đ/c {off.name.split(' ').pop()}</span>
               </th>
             ))}
           </tr>
@@ -59,11 +59,9 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
         <tbody>
           {DAYS.map((day, idx) => {
             const dateStr = getDayDate(idx);
-            const rowBg = idx % 2 === 0 ? 'bg-white' : 'bg-gray-50';
-            
             return (
-              <tr key={day} className={rowBg}>
-                <td className="border border-black p-2 text-center align-top font-bold">
+              <tr key={day}>
+                <td className="border border-black p-2 text-center align-middle font-bold">
                   {day}<br/>{dateStr}
                 </td>
                 {officials.map(official => {
@@ -71,22 +69,21 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
                   cellDate.setDate(weekRange.start.getDate() + idx);
                   const cellISO = cellDate.toISOString().split('T')[0];
                   
-                  const officialItems = schedule.filter(item => {
-                    return item.date === cellISO && item.officialId === official.id;
-                  }).sort((a, b) => a.time.localeCompare(b.time));
+                  const items = schedule.filter(i => i.date === cellISO && i.officialId === official.id)
+                                       .sort((a, b) => a.time.localeCompare(b.time));
 
                   return (
                     <td key={official.id} className="border border-black p-2 align-top text-justify">
-                      {officialItems.length > 0 ? (
-                        <div className="space-y-2">
-                          {officialItems.map(item => (
-                            <div key={item.id} className="mb-1">
-                              <span className="font-bold">- {item.period}: {item.time}</span>, {item.description} <span className="font-bold">({item.location})</span>
+                      {items.length > 0 ? (
+                        <div className="space-y-1.5">
+                          {items.map(item => (
+                            <div key={item.id}>
+                              <span className="font-bold">- {item.time}:</span> {item.description} <span className="font-bold">({item.location})</span>
                             </div>
                           ))}
                         </div>
                       ) : (
-                        <div className="text-[11px] italic text-gray-400">- Làm việc thường xuyên</div>
+                        <div className="text-[10pt] italic text-gray-400">- Làm việc thường xuyên</div>
                       )}
                     </td>
                   );
@@ -97,18 +94,19 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
         </tbody>
       </table>
 
-      {/* Footer Section */}
-      <div className="mt-10 flex justify-between items-start page-break-inside-avoid">
-        <div className="w-[40%] text-[10px] leading-relaxed">
+      {/* Chữ ký & Nơi nhận */}
+      <div className="mt-8 flex justify-between items-start break-inside-avoid">
+        <div className="w-[45%] text-[10pt] leading-snug">
           <p className="font-bold italic underline">Nơi nhận:</p>
-          <p>- Ban Thường vụ Đảng bộ;</p>
-          <p>- Các chi, Đảng bộ trực thuộc;</p>
-          <p>- Lưu Văn phòng Đảng ủy.</p>
+          <p>- Thường trực Đảng ủy;</p>
+          <p>- UBND phường;</p>
+          <p>- Các chi bộ trực thuộc;</p>
+          <p>- Lưu Văn phòng.</p>
         </div>
-        <div className="w-[40%] text-center">
-          <p className="font-bold text-[14px] uppercase">CHÁNH VĂN PHÒNG</p>
-          <div className="h-20"></div>
-          <p className="font-bold text-[14px] mt-2">Nguyễn Thế Anh</p>
+        <div className="w-[45%] text-center">
+          <p className="font-bold text-[12pt] uppercase leading-tight">CHÁNH VĂN PHÒNG</p>
+          <div className="h-24"></div>
+          <p className="font-bold text-[13pt]">Nguyễn Thế Anh</p>
         </div>
       </div>
     </div>
