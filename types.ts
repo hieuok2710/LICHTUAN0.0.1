@@ -30,16 +30,6 @@ export interface TaskAlert {
   relatedItemId?: string;
 }
 
-export interface HeroConfig {
-  systemLabel: string;
-  titleLine1: string;
-  titleLine2: string;
-  subtitle: string;
-  feature1: string;
-  feature2: string;
-  feature3: string;
-}
-
 export interface SystemState {
   version: string;
   timestamp: number;
@@ -47,7 +37,5 @@ export interface SystemState {
   schedule: WorkItem[];
   settings?: {
     notificationsEnabled: boolean;
-    googleClientId?: string;
   };
-  heroConfig?: HeroConfig; // Thêm cấu hình banner
 }

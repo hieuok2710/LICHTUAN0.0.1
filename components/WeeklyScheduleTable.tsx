@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { WorkItem, Official, DayOfWeek } from '../types';
-import { Clock, MapPin, Bell, Edit2, Trash2, Plus, CalendarPlus } from 'lucide-react';
+import { Clock, MapPin, Bell, Edit2, Trash2, PlusCircle } from 'lucide-react';
 
 interface Props {
   schedule: WorkItem[];
@@ -35,18 +35,19 @@ const WorkItemCard = React.memo(({
 }) => {
   return (
     <div 
-      className="relative pl-3 border-l-4 border-red-500 py-2 bg-white rounded-r-lg shadow-sm border border-slate-200 group/item hover:border-red-400 hover:shadow-md transition-all mb-2 last:mb-0"
+      className="relative pl-3 border-l-4 border-red-500 py-2 bg-white rounded-r-lg shadow-sm border border-slate-200 group/item hover:border-red-400 hover:shadow-md transition-all mb-3 last:mb-0"
+      onClick={(e) => e.stopPropagation()} 
     >
-      <div className="absolute top-1 right-1 flex gap-1 opacity-0 group-hover/item:opacity-100 transition-opacity no-print z-10">
+      <div className="absolute top-1 right-1 flex gap-1 opacity-40 group-hover/item:opacity-100 transition-opacity no-print">
         <button 
-          onClick={(e) => { e.stopPropagation(); onEdit(item); }}
+          onClick={() => onEdit(item)}
           className="p-1.5 text-slate-500 hover:text-white hover:bg-blue-600 rounded-md transition-all shadow-sm bg-white border border-slate-100"
           title="Chỉnh sửa"
         >
           <Edit2 size={13} />
         </button>
         <button 
-          onClick={(e) => { e.stopPropagation(); onDeleteRequest(item); }}
+          onClick={() => onDeleteRequest(item)}
           className="p-1.5 text-slate-500 hover:text-white hover:bg-red-600 rounded-md transition-all shadow-sm bg-white border border-slate-100"
           title="Xóa lịch"
         >
@@ -54,7 +55,7 @@ const WorkItemCard = React.memo(({
         </button>
       </div>
 
-      <div className="flex items-center justify-between mb-1.5 pr-2">
+      <div className="flex items-center justify-between mb-1.5 pr-14">
         <div className="flex items-center gap-1.5 text-[10px] font-black text-red-700 uppercase">
           <Clock size={12} className="shrink-0" />
           <span>{item.period}: {item.time}</span>
@@ -69,9 +70,9 @@ const WorkItemCard = React.memo(({
       <p className="text-xs lg:text-sm text-slate-800 leading-relaxed mb-1.5 font-bold pr-2 text-justify">
         {item.description}
       </p>
-      <div className="flex items-center gap-1 text-[10px] text-slate-500 font-bold italic bg-slate-50/80 px-2 py-1 rounded inline-flex border border-slate-100 max-w-full">
+      <div className="flex items-center gap-1 text-[10px] text-slate-500 font-bold italic bg-slate-50/80 px-2 py-1 rounded inline-flex border border-slate-100">
         <MapPin size={10} className="shrink-0" />
-        <span className="truncate">{item.location}</span>
+        <span className="truncate max-w-[150px] lg:max-w-none">{item.location}</span>
       </div>
     </div>
   );
@@ -113,7 +114,7 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
       <table className="w-full border-collapse table-fixed min-w-[1000px]">
         <thead>
           <tr className="bg-slate-900 text-white">
-            <th className="p-4 border border-slate-700 text-center w-28 lg:w-32 z-10 sticky left-0 bg-slate-900 shadow-md">Thứ / Ngày</th>
+            <th className="p-4 border border-slate-700 text-center w-28 lg:w-32 z-10 sticky left-0 bg-slate-900">Thứ / Ngày</th>
             {officials.map(off => (
               <th key={off.id} className="p-4 border border-slate-700 text-center">
                 <div className="font-bold text-xs lg:text-sm leading-tight uppercase tracking-tight">{off.title}</div>
@@ -130,7 +131,7 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
             const rowColorClass = DAY_COLORS[index] || 'bg-white';
             
             return (
-              <tr key={day} className={`${rowColorClass} transition-colors`}>
+              <tr key={day} className={`${rowColorClass} hover:brightness-[0.97] transition-all`}>
                 <td className="p-4 border border-slate-200 text-center align-top sticky left-0 z-10 bg-inherit shadow-[2px_0_5px_rgba(0,0,0,0.05)]">
                   <span className="font-black text-slate-800 block text-base lg:text-lg">{day}</span>
                   <span className="text-sm lg:text-base text-red-600 font-black block mt-1">{dateDisplay}</span>
@@ -140,11 +141,15 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
                   return (
                     <td 
                       key={official.id} 
-                      className="p-2 border border-slate-200 align-top group/cell hover:bg-white/50 transition-colors"
+                      className="p-3 border border-slate-200 align-top relative group/cell cursor-pointer transition-all hover:bg-white/40"
+                      onClick={() => onAddAt(fullDateISO, official.id)}
                     >
-                      <div className="flex flex-col h-full min-h-[100px]">
-                        {/* List Items */}
-                        <div className="flex-1 flex flex-col gap-2 mb-2">
+                      <div className="absolute top-2 right-2 opacity-0 group-hover/cell:opacity-30 transition-opacity pointer-events-none no-print">
+                        <PlusCircle size={20} className="text-slate-900" />
+                      </div>
+
+                      {officialItems.length > 0 ? (
+                        <div className="flex flex-col">
                           {officialItems.map(item => (
                             <WorkItemCard 
                               key={item.id} 
@@ -154,28 +159,11 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
                             />
                           ))}
                         </div>
-
-                        {/* Add Button Area */}
-                        <div className="mt-auto no-print">
-                          {officialItems.length === 0 ? (
-                            <button
-                              onClick={() => onAddAt(fullDateISO, official.id)}
-                              className="w-full h-full min-h-[80px] border-2 border-dashed border-slate-300 rounded-xl flex flex-col items-center justify-center text-slate-400 hover:text-red-600 hover:border-red-400 hover:bg-red-50/50 transition-all gap-1 group/btn"
-                            >
-                              <CalendarPlus size={24} className="group-hover/btn:scale-110 transition-transform" />
-                              <span className="text-[10px] font-bold uppercase tracking-wider">Thêm lịch</span>
-                            </button>
-                          ) : (
-                            <button
-                              onClick={() => onAddAt(fullDateISO, official.id)}
-                              className="w-full py-2 border-2 border-dashed border-transparent hover:border-red-300 rounded-lg flex items-center justify-center text-transparent hover:text-red-600 hover:bg-red-50/50 transition-all gap-2 group/btn opacity-0 group-hover/cell:opacity-100"
-                            >
-                              <Plus size={16} />
-                              <span className="text-[10px] font-bold uppercase">Thêm công tác</span>
-                            </button>
-                          )}
+                      ) : (
+                        <div className="text-[10px] text-slate-400 italic py-4 text-center border border-dashed border-slate-300/50 rounded-lg group-hover/cell:border-slate-400 group-hover/cell:text-slate-500 transition-colors">
+                          Làm việc thường xuyên
                         </div>
-                      </div>
+                      )}
                     </td>
                   );
                 })}
