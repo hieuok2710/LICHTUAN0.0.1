@@ -15,8 +15,23 @@
           to { transform: translateY(0) scale(1); opacity: 1; }
         }
 
+        /* Hiệu ứng nhấp nháy */
+        @keyframes blink-animation {
+          0% { opacity: 1; }
+          50% { opacity: 0.2; }
+          100% { opacity: 1; }
+        }
+
         .animate-popup-in {
           animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+        }
+
+        /* Class đặc biệt cho cán bộ Đặng Văn Nê */
+        .special-official-tag {
+          color: #fbbf24 !important; /* Vàng hổ phách */
+          font-size: 16px !important;
+          animation: blink-animation 1s infinite;
+          text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
         }
 
         /* Vùng in mặc định bị ẩn trên màn hình */
@@ -25,7 +40,7 @@
         /* CHẾ ĐỘ IN ẤN CHUẨN PDF / MÁY IN */
         @media print {
           @page {
-            margin: 0; /* Sẽ được định nghĩa lại bởi PrintLayout dựa trên orientation */
+            margin: 0; 
           }
 
           body { 
@@ -53,7 +68,6 @@
             background: white;
           }
 
-          /* Tối ưu hóa bảng khi in */
           table { 
             border-collapse: collapse !important; 
             width: 100% !important; 
@@ -69,18 +83,15 @@
             overflow-wrap: break-word;
           }
 
-          /* Ngăn chặn ngắt hàng bảng giữa các trang */
           tr { 
             page-break-inside: avoid !important;
           }
 
-          /* Đảm bảo chữ ký không bị tách rời */
           .signature-section {
             page-break-inside: avoid !important;
             margin-top: 20pt;
           }
 
-          /* Giấu các thành phần không cần thiết */
           .print-hidden { display: none !important; }
         }
 

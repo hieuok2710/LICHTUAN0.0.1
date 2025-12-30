@@ -101,7 +101,6 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
     schedule.forEach(item => {
       if (!map[item.date]) map[item.date] = {};
       
-      // Hỗ trợ cả officialIds (mảng) và officialId (đơn) cho dữ liệu cũ
       let ids: string[] = [];
       if (item.officialIds && item.officialIds.length > 0) {
         ids = item.officialIds;
@@ -115,7 +114,6 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
       });
     });
 
-    // Sắp xếp theo giờ
     Object.keys(map).forEach(date => {
       Object.keys(map[date]).forEach(offId => {
         map[date][offId].sort((a, b) => a.time.localeCompare(b.time));
@@ -134,12 +132,17 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
               <div className="h-px bg-slate-700 w-full mb-1"></div>
               <span className="text-xs font-black uppercase tracking-tight text-white">Thứ / Ngày</span>
             </th>
-            {officials.map(off => (
-              <th key={off.id} className="p-5 border-b border-slate-700 text-center">
-                <div className="font-black text-xs lg:text-[13px] leading-tight uppercase tracking-tight text-white">{off.title}</div>
-                <div className="text-[10px] text-red-500 mt-1.5 font-black uppercase tracking-widest bg-white/10 py-1 px-2 rounded-lg inline-block">Đ/c {off.name}</div>
-              </th>
-            ))}
+            {officials.map(off => {
+              const isSpecial = off.name === 'Đặng Văn Nê';
+              return (
+                <th key={off.id} className="p-5 border-b border-slate-700 text-center">
+                  <div className="font-black text-xs lg:text-[13px] leading-tight uppercase tracking-tight text-white">{off.title}</div>
+                  <div className={`mt-1.5 font-black uppercase tracking-widest bg-white/10 py-1 px-2 rounded-lg inline-block ${isSpecial ? 'special-official-tag' : 'text-[10px] text-red-500'}`}>
+                    Đ/c {off.name}
+                  </div>
+                </th>
+              );
+            })}
           </tr>
         </thead>
         <tbody>
