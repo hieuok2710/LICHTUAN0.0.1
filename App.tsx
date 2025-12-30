@@ -74,7 +74,6 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [officials, schedule]);
 
-  // Hàm in bây giờ cực kỳ đơn giản và đáng tin cậy
   const handlePrint = () => {
     window.print();
   };
@@ -188,14 +187,15 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100 pb-20" onClick={() => setContextMenu(prev => ({...prev, visible: false}))} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, visible: true }); }}>
       
-      {/* VÙNG IN LUÔN ĐƯỢC CẬP NHẬT TRONG CÂY REACT NHƯNG ẨN TRÊN WEB */}
+      {/* VÙNG IN ẨN ĐỂ LỆNH IN HỆ THỐNG GỌI */}
       <div className="print-only">
         <PrintLayout schedule={schedule} officials={officials} weekRange={weekRange} />
       </div>
 
       {contextMenu.visible && (
         <div className="fixed z-[999] bg-white border shadow-2xl rounded-2xl py-2 min-w-[240px] animate-popup-in" style={{ top: Math.min(contextMenu.y, window.innerHeight - 250), left: Math.min(contextMenu.x, window.innerWidth - 250) }}>
-           <button onClick={() => { setShowPreviewModal(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm font-bold text-slate-700"><Eye size={18} /> Xem trước & In ấn</button>
+           <button onClick={() => { setShowPreviewModal(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-sm font-bold text-slate-700"><Eye size={18} /> Xem trước bản in</button>
+           <button onClick={handlePrint} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm font-bold text-slate-700"><Printer size={18} /> In nhanh (PDF)</button>
            <button onClick={handleExportDocx} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-sm font-bold text-slate-700"><FileText size={18} /> Xuất Word (.docx)</button>
            <hr className="my-1 border-slate-100" />
            <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-sm font-bold text-slate-700"><Settings size={18} /> Cấu hình hệ thống</button>
@@ -208,12 +208,15 @@ const App: React.FC = () => {
             <div className="bg-red-600 text-white p-2 rounded-lg"><Calendar size={22} /></div>
             <h1 className="text-lg font-black text-slate-900 uppercase tracking-tighter">Long Phú Admin</h1>
           </div>
-          <div className="flex items-center gap-3">
-            <button onClick={handleExportDocx} className="hidden md:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-[11px] font-black uppercase hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
-              <DownloadCloud size={16} /> Tải .DOCX
+          <div className="flex items-center gap-2 md:gap-3">
+            <button onClick={() => setShowPreviewModal(true)} className="flex items-center gap-2 px-3 md:px-4 py-2 bg-emerald-600 text-white rounded-xl text-[10px] md:text-[11px] font-black uppercase hover:bg-emerald-700 shadow-lg shadow-emerald-100 transition-all">
+              <Eye size={16} /> <span className="hidden sm:inline">Xem trước</span>
             </button>
-            <button onClick={handlePrint} className="hidden md:flex items-center gap-2 px-4 py-2 bg-slate-900 text-white rounded-xl text-[11px] font-black uppercase hover:bg-black shadow-lg shadow-slate-200 transition-all">
-              <Printer size={16} /> In nhanh (PDF)
+            <button onClick={handlePrint} className="flex items-center gap-2 px-3 md:px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] md:text-[11px] font-black uppercase hover:bg-black shadow-lg shadow-slate-200 transition-all">
+              <Printer size={16} /> <span className="hidden sm:inline">In nhanh</span>
+            </button>
+            <button onClick={handleExportDocx} className="hidden lg:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-[11px] font-black uppercase hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
+              <DownloadCloud size={16} /> Xuất Word
             </button>
             <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-red-600"><Settings size={20} /></button>
           </div>
@@ -245,27 +248,38 @@ const App: React.FC = () => {
         </div>
       </main>
 
+      {/* MODAL XEM TRƯỚC BẢN IN RIÊNG BIỆT */}
       {showPreviewModal && (
-        <div className="fixed inset-0 bg-slate-900/95 z-[60] flex items-center justify-center p-4">
-          <div className="bg-white rounded-[40px] w-full max-w-6xl h-[92vh] flex flex-col overflow-hidden animate-popup-in shadow-2xl">
-            <div className="p-6 border-b flex justify-between items-center bg-slate-50/50">
+        <div className="fixed inset-0 bg-slate-900/90 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
+          <div className="bg-slate-100 rounded-[40px] w-full max-w-6xl h-[95vh] flex flex-col overflow-hidden animate-popup-in shadow-2xl ring-1 ring-white/10">
+            <div className="p-6 border-b flex justify-between items-center bg-white">
               <div className="flex items-center gap-4">
-                <div className="w-12 h-12 bg-red-100 text-red-600 rounded-2xl flex items-center justify-center"><Printer size={24} /></div>
+                <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200 shadow-sm"><Eye size={24} /></div>
                 <div>
-                   <h2 className="font-black text-lg uppercase tracking-tight">Xem trước bản in công tác</h2>
-                   <p className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Định dạng A4 - Tiêu chuẩn Nghị định 30</p>
+                   <h2 className="font-black text-lg uppercase tracking-tight text-slate-900">Xem trước bản in công tác</h2>
+                   <div className="flex items-center gap-2">
+                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Định dạng A4 dọc</span>
+                     <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
+                     <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest italic">Sẵn sàng xuất PDF</span>
+                   </div>
                 </div>
               </div>
               <div className="flex gap-3">
-                <button onClick={handleExportDocx} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-200"><FileText size={18} /> Tải .DOCX</button>
+                <button onClick={handleExportDocx} className="hidden sm:flex items-center gap-2 bg-blue-100 text-blue-700 border border-blue-200 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-200 transition-all shadow-sm"><FileText size={18} /> Word</button>
                 <button onClick={handlePrint} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-300"><Printer size={18} /> In ngay (PDF)</button>
-                <button onClick={() => setShowPreviewModal(false)} className="ml-4 p-3 text-slate-400 hover:text-slate-600 bg-slate-100 rounded-full transition-all"><X size={24} /></button>
+                <button onClick={() => setShowPreviewModal(false)} className="ml-2 p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-all"><X size={24} /></button>
               </div>
             </div>
-            <div className="flex-1 overflow-y-auto p-12 bg-slate-200/50 flex justify-center custom-scrollbar">
-              <div className="bg-white p-[20mm] shadow-2xl w-[210mm] min-h-[297mm] ring-1 ring-slate-300">
+            
+            <div className="flex-1 overflow-y-auto p-8 md:p-12 bg-slate-200 flex justify-center custom-scrollbar">
+              {/* GIẢ LẬP TỜ GIẤY A4 THỰC TẾ */}
+              <div className="bg-white p-[20mm] shadow-[0_20px_50px_rgba(0,0,0,0.15)] w-full max-w-[210mm] min-h-[297mm] ring-1 ring-slate-300 transform-gpu transition-transform">
                 <PrintLayout schedule={schedule} weekRange={weekRange} officials={officials} />
               </div>
+            </div>
+
+            <div className="p-4 bg-white border-t flex justify-center">
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Khu vực xem trước bản in chính thức - Văn phòng Phường Long Phú</p>
             </div>
           </div>
         </div>
