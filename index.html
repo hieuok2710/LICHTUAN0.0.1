@@ -25,8 +25,12 @@
         /* CHẾ ĐỘ IN ẤN CHUẨN PDF / MÁY IN */
         @media print {
           @page {
-            size: A4 portrait;
             margin: 0;
+          }
+          
+          /* Mặc định là dọc, lớp .is-landscape sẽ được App.tsx thêm vào nếu chọn ngang */
+          @page :pseudo-landscape {
+            size: A4 landscape;
           }
 
           body { 
@@ -49,11 +53,22 @@
             display: block !important;
             font-family: 'Tinos', 'Times New Roman', serif !important;
             color: black !important;
+            margin: 0 auto !important;
+            box-sizing: border-box;
+          }
+
+          /* Khổ dọc (Portrait) */
+          #print-document.portrait {
             width: 210mm;
             min-height: 297mm;
-            margin: 0 auto !important;
             padding: 20mm 15mm 20mm 30mm !important;
-            box-sizing: border-box;
+          }
+
+          /* Khổ ngang (Landscape) */
+          #print-document.landscape {
+            width: 297mm;
+            min-height: 210mm;
+            padding: 15mm 15mm 15mm 20mm !important;
           }
 
           table { 

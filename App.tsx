@@ -9,7 +9,8 @@ import OfficialSettingsModal from './components/OfficialSettingsModal';
 import WorkItemFormModal from './components/WorkItemFormModal';
 import WelcomeHero from './components/WelcomeHero';
 import { 
-  Calendar, Plus, Printer, Eye, ChevronLeft, ChevronRight, X, Settings, FileText, DownloadCloud
+  Calendar, Plus, Printer, Eye, ChevronLeft, ChevronRight, X, Settings, FileText, 
+  DownloadCloud, Layout, Maximize2
 } from 'lucide-react';
 
 const STORAGE_KEY = 'LONG_PHU_WORK_SCHEDULE_STATE_V1_FIX';
@@ -43,6 +44,7 @@ const App: React.FC = () => {
   const [showSettings, setShowSettings] = useState(false);
   const [isFormOpen, setIsFormOpen] = useState(false);
   const [showPreviewModal, setShowPreviewModal] = useState(false);
+  const [printOrientation, setPrintOrientation] = useState<'portrait' | 'landscape'>('portrait');
   const [editingItem, setEditingItem] = useState<WorkItem | null>(null);
   const [itemToDelete, setItemToDelete] = useState<WorkItem | null>(null);
   const [formPrefill, setFormPrefill] = useState<{date: string, officialId: string} | null>(null);
@@ -82,9 +84,11 @@ const App: React.FC = () => {
     const dateNow = new Date();
     const dateStr = `${dateNow.getDate()} tháng ${dateNow.getMonth() + 1} năm ${dateNow.getFullYear()}`;
     
+    // Logic export word linh hoạt theo orientation (ngang mặc định rộng hơn)
+    const isLandscape = printOrientation === 'landscape';
     const css = `
       <style>
-        @page WordSection1 { size: 595.3pt 841.9pt; margin: 56.7pt 42.5pt 56.7pt 85.05pt; }
+        @page WordSection1 { size: ${isLandscape ? '841.9pt 595.3pt' : '595.3pt 841.9pt'}; margin: 42.5pt 42.5pt 42.5pt ${isLandscape ? '42.5pt' : '85.05pt'}; }
         div.WordSection1 { page: WordSection1; }
         table { border-collapse: collapse; width: 100%; border: 1px solid black; }
         th, td { border: 1px solid black; padding: 5pt; font-family: "Times New Roman", serif; font-size: 11pt; }
@@ -197,20 +201,10 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100 pb-20" onClick={() => setContextMenu(prev => ({...prev, visible: false}))} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, visible: true }); }}>
       
-      {/* VÙNG IN ẨN LUÔN NHẬN DỮ LIỆU MỚI NHẤT TỪ STATE */}
+      {/* VÙNG IN ẨN */}
       <div className="print-only">
-        <PrintLayout schedule={schedule} officials={officials} weekRange={weekRange} />
+        <PrintLayout schedule={schedule} officials={officials} weekRange={weekRange} orientation={printOrientation} />
       </div>
-
-      {contextMenu.visible && (
-        <div className="fixed z-[999] bg-white border shadow-2xl rounded-2xl py-2 min-w-[240px] animate-popup-in" style={{ top: Math.min(contextMenu.y, window.innerHeight - 250), left: Math.min(contextMenu.x, window.innerWidth - 250) }}>
-           <button onClick={() => { setShowPreviewModal(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-sm font-bold text-slate-700"><Eye size={18} /> Xem trước bản in</button>
-           <button onClick={handlePrint} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm font-bold text-slate-700"><Printer size={18} /> In nhanh (PDF)</button>
-           <button onClick={handleExportDocx} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-blue-50 text-sm font-bold text-slate-700"><FileText size={18} /> Xuất Word (.docx)</button>
-           <hr className="my-1 border-slate-100" />
-           <button onClick={() => setShowSettings(true)} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-slate-50 text-sm font-bold text-slate-700"><Settings size={18} /> Cấu hình hệ thống</button>
-        </div>
-      )}
 
       <header className="bg-white border-b sticky top-0 z-40 shadow-sm h-16 no-print">
         <div className="max-w-7xl mx-auto px-4 h-full flex justify-between items-center">
@@ -224,9 +218,6 @@ const App: React.FC = () => {
             </button>
             <button onClick={handlePrint} className="flex items-center gap-2 px-3 md:px-4 py-2 bg-slate-900 text-white rounded-xl text-[10px] md:text-[11px] font-black uppercase hover:bg-black shadow-lg shadow-slate-200 transition-all">
               <Printer size={16} /> <span className="hidden sm:inline">In nhanh</span>
-            </button>
-            <button onClick={handleExportDocx} className="hidden lg:flex items-center gap-2 px-4 py-2 bg-blue-600 text-white rounded-xl text-[11px] font-black uppercase hover:bg-blue-700 shadow-lg shadow-blue-200 transition-all">
-              <DownloadCloud size={16} /> Xuất Word
             </button>
             <button onClick={() => setShowSettings(true)} className="p-2 text-slate-500 hover:text-red-600"><Settings size={20} /></button>
           </div>
@@ -244,11 +235,10 @@ const App: React.FC = () => {
             </div>
             <button onClick={() => changeWeek(7)} className="p-2 hover:bg-slate-50 rounded-lg transition-colors"><ChevronRight size={24}/></button>
           </div>
-          <button onClick={() => { setEditingItem(null); setFormPrefill(null); setIsFormOpen(true); }} className="bg-red-600 text-white px-8 py-3 rounded-2xl text-xs font-black shadow-xl shadow-red-200 hover:bg-red-700 transition-all flex items-center gap-2 uppercase tracking-widest"><Plus size={18} /> Thêm công tác mới</button>
+          <button onClick={() => { setEditingItem(null); setFormPrefill(null); setIsFormOpen(true); }} className="bg-red-600 text-white px-8 py-3 rounded-2xl text-xs font-black shadow-xl shadow-red-200 hover:bg-red-700 transition-all flex items-center gap-2 uppercase tracking-widest"><Plus size={18} /> Thêm công tác</button>
         </div>
 
-        <div className="bg-white p-1 rounded-3xl border shadow-2xl relative overflow-hidden">
-          <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-600 to-orange-500"></div>
+        <div className="bg-white p-1 rounded-3xl border shadow-2xl relative overflow-hidden overflow-x-auto">
           <WeeklyScheduleTable 
             schedule={schedule} officials={officials} selectedDate={selectedDate} 
             onEdit={(item) => { setEditingItem(item); setFormPrefill(null); setIsFormOpen(true); }} 
@@ -258,22 +248,37 @@ const App: React.FC = () => {
         </div>
       </main>
 
-      {/* MODAL XEM TRƯỚC BẢN IN RIÊNG BIỆT */}
+      {/* MODAL XEM TRƯỚC BẢN IN */}
       {showPreviewModal && (
         <div className="fixed inset-0 bg-slate-900/90 z-[60] flex items-center justify-center p-4 backdrop-blur-sm">
-          <div className="bg-slate-100 rounded-[40px] w-full max-w-6xl h-[95vh] flex flex-col overflow-hidden animate-popup-in shadow-2xl ring-1 ring-white/10">
-            <div className="p-6 border-b flex justify-between items-center bg-white">
+          <div className="bg-slate-100 rounded-[40px] w-full max-w-7xl h-[95vh] flex flex-col overflow-hidden animate-popup-in shadow-2xl ring-1 ring-white/10">
+            <div className="p-6 border-b flex justify-between items-center bg-white shrink-0">
               <div className="flex items-center gap-4">
                 <div className="w-12 h-12 bg-emerald-100 text-emerald-600 rounded-2xl flex items-center justify-center border border-emerald-200 shadow-sm"><Eye size={24} /></div>
                 <div>
-                   <h2 className="font-black text-lg uppercase tracking-tight text-slate-900">Xem trước bản in công tác</h2>
+                   <h2 className="font-black text-lg uppercase tracking-tight text-slate-900">Xem trước bản in</h2>
                    <div className="flex items-center gap-2">
-                     <span className="text-[10px] text-slate-500 font-bold uppercase tracking-widest">Định dạng A4 dọc</span>
-                     <span className="w-1 h-1 bg-slate-300 rounded-full"></span>
                      <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest italic">Sẵn sàng xuất PDF</span>
                    </div>
                 </div>
               </div>
+              
+              {/* BỘ CHUYỂN ĐỔI ĐỊNH DẠNG */}
+              <div className="flex items-center bg-slate-100 p-1.5 rounded-2xl border border-slate-200 gap-1">
+                <button 
+                  onClick={() => setPrintOrientation('portrait')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase transition-all ${printOrientation === 'portrait' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Layout size={14} className="rotate-0" /> Khổ dọc (A4)
+                </button>
+                <button 
+                  onClick={() => setPrintOrientation('landscape')}
+                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase transition-all ${printOrientation === 'landscape' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
+                >
+                  <Maximize2 size={14} className="rotate-90" /> Khổ ngang (A4)
+                </button>
+              </div>
+
               <div className="flex gap-3">
                 <button onClick={handleExportDocx} className="hidden sm:flex items-center gap-2 bg-blue-100 text-blue-700 border border-blue-200 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-200 transition-all shadow-sm"><FileText size={18} /> Word</button>
                 <button onClick={handlePrint} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-300"><Printer size={18} /> In ngay (PDF)</button>
@@ -282,14 +287,20 @@ const App: React.FC = () => {
             </div>
             
             <div className="flex-1 overflow-y-auto p-8 md:p-12 bg-slate-200 flex justify-center custom-scrollbar">
-              {/* GIẢ LẬP TỜ GIẤY A4 THỰC TẾ */}
-              <div className="bg-white p-[20mm] shadow-[0_20px_50px_rgba(0,0,0,0.15)] w-full max-w-[210mm] min-h-[297mm] ring-1 ring-slate-300 transform-gpu transition-transform">
-                <PrintLayout schedule={schedule} weekRange={weekRange} officials={officials} />
+              {/* GIẢ LẬP TỜ GIẤY THEO ORIENTATION */}
+              <div 
+                className={`bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] ring-1 ring-slate-300 transition-all duration-500 ease-in-out ${
+                  printOrientation === 'portrait' 
+                  ? 'w-[210mm] min-h-[297mm] p-[20mm]' 
+                  : 'w-[297mm] min-h-[210mm] p-[15mm]'
+                }`}
+              >
+                <PrintLayout schedule={schedule} weekRange={weekRange} officials={officials} orientation={printOrientation} />
               </div>
             </div>
 
             <div className="p-4 bg-white border-t flex justify-center">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Khu vực xem trước bản in chính thức - Văn phòng Phường Long Phú</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Hệ thống hỗ trợ in ấn thông minh v1.0 - Văn phòng Phường Long Phú</p>
             </div>
           </div>
         </div>
