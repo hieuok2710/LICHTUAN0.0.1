@@ -1,7 +1,7 @@
 
 import React, { useMemo } from 'react';
 import { WorkItem, Official, DayOfWeek } from '../types';
-import { Clock, MapPin, Bell, Edit2, Trash2, Plus, PlusCircle } from 'lucide-react';
+import { Clock, MapPin, Bell, Edit2, Trash2, Plus } from 'lucide-react';
 
 interface Props {
   schedule: WorkItem[];
@@ -100,9 +100,21 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
     const map: Record<string, Record<string, WorkItem[]>> = {};
     schedule.forEach(item => {
       if (!map[item.date]) map[item.date] = {};
-      if (!map[item.date][item.officialId]) map[item.date][item.officialId] = [];
-      map[item.date][item.officialId].push(item);
+      
+      // Hỗ trợ cả officialIds (mảng) và officialId (đơn) cho dữ liệu cũ
+      let ids: string[] = [];
+      if (item.officialIds && item.officialIds.length > 0) {
+        ids = item.officialIds;
+      } else if ((item as any).officialId) {
+        ids = [(item as any).officialId];
+      }
+
+      ids.forEach(offId => {
+        if (!map[item.date][offId]) map[item.date][offId] = [];
+        map[item.date][offId].push(item);
+      });
     });
+
     // Sắp xếp theo giờ
     Object.keys(map).forEach(date => {
       Object.keys(map[date]).forEach(offId => {
@@ -140,14 +152,12 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
             
             return (
               <tr key={day} className={`${rowColorClass} transition-all relative group`}>
-                {/* Cột Thứ/Ngày */}
                 <td className={`p-5 border-r border-slate-200 text-center align-top sticky left-0 z-10 ${isToday ? 'bg-red-50' : 'bg-inherit'} shadow-[4px_0_10px_rgba(0,0,0,0.03)]`}>
                   <div className={`text-base lg:text-xl font-black ${isToday ? 'text-red-700' : 'text-slate-800'}`}>{day}</div>
                   <div className={`text-sm lg:text-base font-black block mt-1 ${isToday ? 'text-red-600 bg-white px-2 py-1 rounded-full shadow-sm' : 'text-slate-500'}`}>{dateDisplay}</div>
                   {isToday && <div className="mt-3 inline-block px-2 py-0.5 bg-red-600 text-white text-[8px] font-black rounded-full uppercase tracking-widest">Hôm nay</div>}
                 </td>
 
-                {/* Các cột cán bộ */}
                 {officials.map(official => {
                   const officialItems = groupedSchedule[fullDateISO]?.[official.id] || [];
                   return (
@@ -156,7 +166,6 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
                       className="p-3 border-r border-slate-200 align-top group/cell relative"
                     >
                       <div className="flex flex-col h-full min-h-[120px]">
-                        {/* Danh sách các item */}
                         <div className="flex-1">
                           {officialItems.length > 0 ? (
                             <div className="flex flex-col">
@@ -176,7 +185,6 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
                           )}
                         </div>
 
-                        {/* Nút thêm mới ở cuối ô - Luôn khả dụng */}
                         <button 
                           onClick={() => onAddAt(fullDateISO, official.id)}
                           className="w-full mt-2 py-2 border-2 border-dashed border-slate-200 rounded-xl flex items-center justify-center gap-2 text-slate-400 hover:text-red-600 hover:border-red-300 hover:bg-red-50/50 transition-all no-print group/add-btn"

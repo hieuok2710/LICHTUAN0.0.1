@@ -15,7 +15,7 @@ export interface WorkItem {
   period: 'Sáng' | 'Chiều';
   description: string;
   location: string;
-  officialId: string;
+  officialIds: string[]; // Thay đổi từ officialId: string sang officialIds: string[]
   isCompleted?: boolean;
   remind?: boolean;
 }

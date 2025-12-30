@@ -1,9 +1,9 @@
 
-import React, { useMemo } from 'react';
-import { WorkItem, Official } from '../types';
+import React, { useMemo, useState, useEffect } from 'react';
+import { WorkItem, Official, DayOfWeek } from '../types';
 import { 
   X, Calendar, Clock, User, AlignLeft, MapPin, 
-  BellRing, Save, ChevronDown
+  BellRing, Save, ChevronDown, CheckSquare, Square
 } from 'lucide-react';
 
 interface WorkItemFormModalProps {
@@ -16,10 +16,30 @@ interface WorkItemFormModalProps {
   selectedDate: Date;
 }
 
+const DAYS_MAP: DayOfWeek[] = ['Chủ Nhật', 'Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy'];
+
 const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
   isOpen, onClose, onSubmit, editingItem, officials, prefill, selectedDate
 }) => {
-  // Tạo danh sách giờ tinh gọn: 30 phút/lần cho giờ hành chính
+  const [selectedOfficialIds, setSelectedOfficialIds] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (editingItem) {
+      // Hỗ trợ migration dữ liệu cũ nếu chỉ có officialId
+      if (editingItem.officialIds && editingItem.officialIds.length > 0) {
+        setSelectedOfficialIds(editingItem.officialIds);
+      } else if ((editingItem as any).officialId) {
+        setSelectedOfficialIds([(editingItem as any).officialId]);
+      } else {
+        setSelectedOfficialIds([]);
+      }
+    } else if (prefill) {
+      setSelectedOfficialIds([prefill.officialId]);
+    } else {
+      setSelectedOfficialIds([]);
+    }
+  }, [editingItem, prefill, isOpen]);
+
   const timeOptions = useMemo(() => {
     const options = [
       '07:00', '07:30', '08:00', '08:30', '09:00', '09:30', '10:00', '10:30', '11:00', '11:30',
@@ -35,20 +55,36 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
 
   if (!isOpen) return null;
 
+  const toggleOfficial = (id: string) => {
+    setSelectedOfficialIds(prev => 
+      prev.includes(id) ? prev.filter(oid => oid !== id) : [...prev, id]
+    );
+  };
+
   const handleFormSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
+    if (selectedOfficialIds.length === 0) {
+      alert("Vui lòng chọn ít nhất một cán bộ phụ trách.");
+      return;
+    }
+
     const formData = new FormData(e.currentTarget);
+    const dateVal = formData.get('date') as string;
     const time = formData.get('time') as string;
     
+    // Xác định thứ dựa trên ngày được chọn
+    const d = new Date(dateVal);
+    const dayName = DAYS_MAP[d.getDay()];
+
     const itemData: WorkItem = {
       id: editingItem ? editingItem.id : Math.random().toString(36).substr(2, 9),
-      day: 'Thứ Hai', // Logic tính thứ sẽ được xử lý khi render hoặc lưu
-      date: formData.get('date') as string, 
+      day: dayName === 'Chủ Nhật' ? 'Chủ Nhật' : dayName, 
+      date: dateVal, 
       time: time,
       period: parseInt(time.split(':')[0]) < 12 ? 'Sáng' : 'Chiều',
       description: formData.get('description') as string,
       location: formData.get('location') as string,
-      officialId: formData.get('officialId') as string,
+      officialIds: selectedOfficialIds,
       remind: formData.get('remind') === 'on',
     };
     
@@ -58,7 +94,6 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
   return (
     <div className="fixed inset-0 bg-slate-900/70 backdrop-blur-md z-[100] flex items-center justify-center p-4">
       <div className="bg-white rounded-[32px] shadow-2xl max-w-xl w-full overflow-hidden animate-popup-in border border-white/20 flex flex-col max-h-[90vh]">
-        {/* Header */}
         <div className="bg-slate-900 px-8 py-5 text-white flex justify-between items-center shrink-0">
           <div className="flex items-center gap-4">
             <div className="p-3 bg-red-600 rounded-2xl">
@@ -78,7 +113,6 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
 
         <form onSubmit={handleFormSubmit} className="flex flex-col flex-1 overflow-hidden">
           <div className="p-6 md:p-8 space-y-5 overflow-y-auto custom-scrollbar">
-            {/* Ngày & Giờ */}
             <div className="grid grid-cols-2 gap-4">
               <div className="space-y-1.5">
                 <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
@@ -112,24 +146,31 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
               </div>
             </div>
 
-            {/* Cán bộ */}
-            <div className="space-y-1.5">
+            <div className="space-y-2">
               <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
-                <User size={12} className="text-red-500" /> Cán bộ phụ trách
+                <User size={12} className="text-red-500" /> Cán bộ phụ trách (Chọn nhiều)
               </label>
-              <div className="relative">
-                <select 
-                  name="officialId" 
-                  defaultValue={editingItem?.officialId || prefill?.officialId || officials[0]?.id} 
-                  className="w-full p-4 bg-slate-50 border border-slate-100 rounded-2xl text-sm font-bold focus:bg-white focus:ring-2 focus:ring-red-500/20 focus:border-red-500 outline-none appearance-none cursor-pointer"
-                >
-                  {officials.map(o => <option key={o.id} value={o.id}>{o.name} - {o.title}</option>)}
-                </select>
-                <ChevronDown className="absolute right-4 top-4 text-slate-400 pointer-events-none" size={18} />
+              <div className="grid grid-cols-1 gap-2">
+                {officials.map(o => (
+                  <div 
+                    key={o.id} 
+                    onClick={() => toggleOfficial(o.id)}
+                    className={`flex items-center gap-3 p-3 rounded-2xl border transition-all cursor-pointer ${
+                      selectedOfficialIds.includes(o.id) 
+                      ? 'bg-red-50 border-red-200 text-red-700 shadow-sm' 
+                      : 'bg-slate-50 border-slate-100 text-slate-600 hover:bg-slate-100'
+                    }`}
+                  >
+                    {selectedOfficialIds.includes(o.id) ? <CheckSquare size={18} /> : <Square size={18} />}
+                    <div className="flex-1">
+                      <p className="text-xs font-black leading-none">{o.name}</p>
+                      <p className="text-[10px] font-bold opacity-70 mt-1 uppercase">{o.title}</p>
+                    </div>
+                  </div>
+                ))}
               </div>
             </div>
 
-            {/* ĐỊA ĐIỂM (HIỂN THỊ NGAY) */}
             <div className="space-y-1.5">
               <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                 <MapPin size={12} className="text-red-500" /> Địa điểm
@@ -146,7 +187,6 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
               </div>
             </div>
 
-            {/* Nội dung */}
             <div className="space-y-1.5">
               <label className="flex items-center gap-2 text-[10px] font-black text-slate-500 uppercase tracking-widest ml-1">
                 <AlignLeft size={12} className="text-red-500" /> Nội dung công việc
@@ -161,7 +201,6 @@ const WorkItemFormModal: React.FC<WorkItemFormModalProps> = ({
               ></textarea>
             </div>
 
-            {/* Tùy chọn nhắc nhở */}
             <div className="flex items-center justify-between p-4 bg-slate-50 border border-slate-100 rounded-2xl">
               <div className="flex gap-3 items-center">
                 <div className="p-2 bg-white rounded-lg text-red-600 border border-slate-200">

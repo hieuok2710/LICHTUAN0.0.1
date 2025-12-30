@@ -66,7 +66,6 @@ const App: React.FC = () => {
     };
   }, [selectedDate]);
 
-  // Lưu trữ dữ liệu
   useEffect(() => {
     const state: SystemState = {
       version: '1.0',
@@ -78,16 +77,13 @@ const App: React.FC = () => {
   }, [officials, schedule]);
 
   const handlePrint = () => {
-    // 1. Render PrintLayout vào wrapper ẩn để in
     const wrapper = document.getElementById('print-document-wrapper');
     if (wrapper) {
       const root = ReactDOM.createRoot(wrapper);
       root.render(<PrintLayout schedule={schedule} officials={officials} weekRange={weekRange} />);
       
-      // 2. Kích hoạt lệnh in hệ thống sau khi render
       setTimeout(() => {
         window.print();
-        // Xóa sau khi in
         setTimeout(() => wrapper.innerHTML = '', 1000);
       }, 500);
     }
@@ -97,7 +93,6 @@ const App: React.FC = () => {
     const dateNow = new Date();
     const dateStr = `${dateNow.getDate()} tháng ${dateNow.getMonth() + 1} năm ${dateNow.getFullYear()}`;
     
-    // Header & Styles for Word 2016+
     const css = `
       <style>
         @page WordSection1 { size: 595.3pt 841.9pt; margin: 56.7pt 42.5pt 56.7pt 85.05pt; }
@@ -146,7 +141,10 @@ const App: React.FC = () => {
               <tr>
                 <td class="text-center font-bold">${day}<br/>${dateStrCol}</td>
                 ${officials.map(off => {
-                  const items = schedule.filter(i => i.date === cellISO && i.officialId === off.id).sort((a,b) => a.time.localeCompare(b.time));
+                  const items = schedule.filter(i => {
+                    const ids = i.officialIds || (i as any).officialId ? [(i as any).officialId] : [];
+                    return i.date === cellISO && ids.includes(off.id);
+                  }).sort((a,b) => a.time.localeCompare(b.time));
                   return `
                     <td style="vertical-align:top; text-align:justify;">
                       ${items.length > 0 ? items.map(item => `<div>- <b>${item.time}:</b> ${item.description} <b>(${item.location})</b></div>`).join('') : '<i style="color:#999;">- Làm việc thường xuyên</i>'}
@@ -200,7 +198,6 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100 pb-20" onClick={() => setContextMenu(prev => ({...prev, visible: false}))} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, visible: true }); }}>
       
-      {/* Quick Menu */}
       {contextMenu.visible && (
         <div className="fixed z-[999] bg-white border shadow-2xl rounded-2xl py-2 min-w-[240px] animate-popup-in" style={{ top: Math.min(contextMenu.y, window.innerHeight - 250), left: Math.min(contextMenu.x, window.innerWidth - 250) }}>
            <button onClick={() => { setShowPreviewModal(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm font-bold text-slate-700"><Eye size={18} /> Xem trước & In ấn</button>
@@ -239,21 +236,20 @@ const App: React.FC = () => {
             </div>
             <button onClick={() => changeWeek(7)} className="p-2 hover:bg-slate-50 rounded-lg transition-colors"><ChevronRight size={24}/></button>
           </div>
-          <button onClick={() => { setEditingItem(null); setIsFormOpen(true); }} className="bg-red-600 text-white px-8 py-3 rounded-2xl text-xs font-black shadow-xl shadow-red-200 hover:bg-red-700 transition-all flex items-center gap-2 uppercase tracking-widest"><Plus size={18} /> Thêm công tác mới</button>
+          <button onClick={() => { setEditingItem(null); setFormPrefill(null); setIsFormOpen(true); }} className="bg-red-600 text-white px-8 py-3 rounded-2xl text-xs font-black shadow-xl shadow-red-200 hover:bg-red-700 transition-all flex items-center gap-2 uppercase tracking-widest"><Plus size={18} /> Thêm công tác mới</button>
         </div>
 
         <div className="bg-white p-1 rounded-3xl border shadow-2xl relative overflow-hidden">
           <div className="absolute top-0 left-0 w-full h-2 bg-gradient-to-r from-red-600 to-orange-500"></div>
           <WeeklyScheduleTable 
             schedule={schedule} officials={officials} selectedDate={selectedDate} 
-            onEdit={(item) => { setEditingItem(item); setIsFormOpen(true); }} 
+            onEdit={(item) => { setEditingItem(item); setFormPrefill(null); setIsFormOpen(true); }} 
             onDeleteRequest={setItemToDelete} 
             onAddAt={(date, officialId) => { setEditingItem(null); setFormPrefill({ date, officialId }); setIsFormOpen(true); }} 
           />
         </div>
       </main>
 
-      {/* Preview Modal */}
       {showPreviewModal && (
         <div className="fixed inset-0 bg-slate-900/95 z-[60] flex items-center justify-center p-4">
           <div className="bg-white rounded-[40px] w-full max-w-6xl h-[92vh] flex flex-col overflow-hidden animate-popup-in shadow-2xl">
@@ -280,12 +276,13 @@ const App: React.FC = () => {
         </div>
       )}
 
-      {/* Forms & Popups */}
       <WorkItemFormModal isOpen={isFormOpen} onClose={() => {setIsFormOpen(false); setEditingItem(null); setFormPrefill(null);}} 
         onSubmit={(item) => { 
           if (editingItem) setSchedule(prev => prev.map(i => i.id === editingItem.id ? item : i));
           else setSchedule(prev => [...prev, item]);
           setIsFormOpen(false);
+          setEditingItem(null);
+          setFormPrefill(null);
         }} 
         editingItem={editingItem} officials={officials} prefill={formPrefill} selectedDate={selectedDate} 
       />

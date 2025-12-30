@@ -69,8 +69,10 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
                   cellDate.setDate(weekRange.start.getDate() + idx);
                   const cellISO = cellDate.toISOString().split('T')[0];
                   
-                  const items = schedule.filter(i => i.date === cellISO && i.officialId === official.id)
-                                       .sort((a, b) => a.time.localeCompare(b.time));
+                  const items = schedule.filter(i => {
+                    const ids = i.officialIds || (i as any).officialId ? [(i as any).officialId] : [];
+                    return i.date === cellISO && ids.includes(official.id);
+                  }).sort((a, b) => a.time.localeCompare(b.time));
 
                   return (
                     <td key={official.id} className="border border-black p-2 align-top text-justify">
