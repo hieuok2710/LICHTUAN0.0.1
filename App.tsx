@@ -1,10 +1,8 @@
 
 import React, { useState, useEffect, useMemo } from 'react';
-import ReactDOM from 'react-dom/client';
 import { OFFICIALS as DEFAULT_OFFICIALS, INITIAL_SCHEDULE } from './constants';
-import { WorkItem, Official, TaskAlert, SystemState, DayOfWeek } from './types';
+import { WorkItem, Official, SystemState } from './types';
 import WeeklyScheduleTable from './components/WeeklyScheduleTable';
-import ReminderPopup from './components/ReminderPopup';
 import PrintLayout from './components/PrintLayout';
 import ConfirmationModal from './components/ConfirmationModal';
 import OfficialSettingsModal from './components/OfficialSettingsModal';
@@ -76,17 +74,9 @@ const App: React.FC = () => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
   }, [officials, schedule]);
 
+  // Hàm in bây giờ cực kỳ đơn giản và đáng tin cậy
   const handlePrint = () => {
-    const wrapper = document.getElementById('print-document-wrapper');
-    if (wrapper) {
-      const root = ReactDOM.createRoot(wrapper);
-      root.render(<PrintLayout schedule={schedule} officials={officials} weekRange={weekRange} />);
-      
-      setTimeout(() => {
-        window.print();
-        setTimeout(() => wrapper.innerHTML = '', 1000);
-      }, 500);
-    }
+    window.print();
   };
 
   const handleExportDocx = () => {
@@ -142,7 +132,7 @@ const App: React.FC = () => {
                 <td class="text-center font-bold">${day}<br/>${dateStrCol}</td>
                 ${officials.map(off => {
                   const items = schedule.filter(i => {
-                    const ids = i.officialIds || (i as any).officialId ? [(i as any).officialId] : [];
+                    const ids = i.officialIds || ((i as any).officialId ? [(i as any).officialId] : []);
                     return i.date === cellISO && ids.includes(off.id);
                   }).sort((a,b) => a.time.localeCompare(b.time));
                   return `
@@ -198,6 +188,11 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100 pb-20" onClick={() => setContextMenu(prev => ({...prev, visible: false}))} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, visible: true }); }}>
       
+      {/* VÙNG IN LUÔN ĐƯỢC CẬP NHẬT TRONG CÂY REACT NHƯNG ẨN TRÊN WEB */}
+      <div className="print-only">
+        <PrintLayout schedule={schedule} officials={officials} weekRange={weekRange} />
+      </div>
+
       {contextMenu.visible && (
         <div className="fixed z-[999] bg-white border shadow-2xl rounded-2xl py-2 min-w-[240px] animate-popup-in" style={{ top: Math.min(contextMenu.y, window.innerHeight - 250), left: Math.min(contextMenu.x, window.innerWidth - 250) }}>
            <button onClick={() => { setShowPreviewModal(true); }} className="w-full flex items-center gap-3 px-4 py-2.5 hover:bg-red-50 text-sm font-bold text-slate-700"><Eye size={18} /> Xem trước & In ấn</button>
