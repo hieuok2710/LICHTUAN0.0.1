@@ -11,7 +11,15 @@ interface PrintLayoutProps {
 const DAYS: DayOfWeek[] = ['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'];
 
 const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRange }) => {
-  const getDayDate = (dayIndex: number) => {
+  // Hàm tạo chuỗi YYYY-MM-DD chính xác theo giờ địa phương để so khớp dữ liệu
+  const getLocalDateISO = (date: Date) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const getDayDateDisplay = (dayIndex: number) => {
     const d = new Date(weekRange.start);
     d.setDate(weekRange.start.getDate() + dayIndex);
     return d.toLocaleDateString('vi-VN');
@@ -58,19 +66,23 @@ const PrintLayout: React.FC<PrintLayoutProps> = ({ schedule, officials, weekRang
         </thead>
         <tbody>
           {DAYS.map((day, idx) => {
-            const dateStr = getDayDate(idx);
+            const dateStr = getDayDateDisplay(idx);
+            // Lấy ngày chuẩn ISO của ô hiện tại (Local Time)
+            const cellDate = new Date(weekRange.start);
+            cellDate.setDate(weekRange.start.getDate() + idx);
+            const cellISO = getLocalDateISO(cellDate);
+
             return (
               <tr key={day}>
                 <td className="border border-black p-2 text-center align-middle font-bold">
                   {day}<br/>{dateStr}
                 </td>
                 {officials.map(official => {
-                  const cellDate = new Date(weekRange.start);
-                  cellDate.setDate(weekRange.start.getDate() + idx);
-                  const cellISO = cellDate.toISOString().split('T')[0];
-                  
+                  // Lọc lịch của cán bộ trong ngày này
                   const items = schedule.filter(i => {
-                    const ids = i.officialIds || (i as any).officialId ? [(i as any).officialId] : [];
+                    const ids = i.officialIds && i.officialIds.length > 0 
+                      ? i.officialIds 
+                      : (i as any).officialId ? [(i as any).officialId] : [];
                     return i.date === cellISO && ids.includes(official.id);
                   }).sort((a, b) => a.time.localeCompare(b.time));
 

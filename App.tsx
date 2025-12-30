@@ -94,6 +94,13 @@ const App: React.FC = () => {
       </style>
     `;
 
+    const getLocalDateISO = (date: Date) => {
+      const year = date.getFullYear();
+      const month = String(date.getMonth() + 1).padStart(2, '0');
+      const day = String(date.getDate()).padStart(2, '0');
+      return `${year}-${month}-${day}`;
+    };
+
     const htmlContent = `
       <div class="WordSection1">
         <table border="0" style="border:none; width:100%;">
@@ -123,7 +130,7 @@ const App: React.FC = () => {
           ${['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'].map((day, idx) => {
             const d = new Date(weekRange.start);
             d.setDate(weekRange.start.getDate() + idx);
-            const cellISO = d.toISOString().split('T')[0];
+            const cellISO = getLocalDateISO(d);
             const dateStrCol = d.toLocaleDateString('vi-VN');
             
             return `
@@ -131,7 +138,9 @@ const App: React.FC = () => {
                 <td class="text-center font-bold">${day}<br/>${dateStrCol}</td>
                 ${officials.map(off => {
                   const items = schedule.filter(i => {
-                    const ids = i.officialIds || ((i as any).officialId ? [(i as any).officialId] : []);
+                    const ids = i.officialIds && i.officialIds.length > 0 
+                      ? i.officialIds 
+                      : (i as any).officialId ? [(i as any).officialId] : [];
                     return i.date === cellISO && ids.includes(off.id);
                   }).sort((a,b) => a.time.localeCompare(b.time));
                   return `
@@ -150,6 +159,7 @@ const App: React.FC = () => {
             <td style="border:none; width:50%;">
               <p class="font-bold" style="text-decoration:underline; font-style:italic;">Nơi nhận:</p>
               <p>- Thường trực Đảng ủy;</p>
+              <p>- UBND phường;</p>
               <p>- Lưu Văn phòng.</p>
             </td>
             <td style="border:none; text-align:center;">
@@ -187,7 +197,7 @@ const App: React.FC = () => {
   return (
     <div className="min-h-screen bg-slate-100 pb-20" onClick={() => setContextMenu(prev => ({...prev, visible: false}))} onContextMenu={(e) => { e.preventDefault(); setContextMenu({ x: e.clientX, y: e.clientY, visible: true }); }}>
       
-      {/* VÙNG IN ẨN ĐỂ LỆNH IN HỆ THỐNG GỌI */}
+      {/* VÙNG IN ẨN LUÔN NHẬN DỮ LIỆU MỚI NHẤT TỪ STATE */}
       <div className="print-only">
         <PrintLayout schedule={schedule} officials={officials} weekRange={weekRange} />
       </div>
