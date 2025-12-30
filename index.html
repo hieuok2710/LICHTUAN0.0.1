@@ -15,23 +15,26 @@
           to { transform: translateY(0) scale(1); opacity: 1; }
         }
 
-        /* Hiệu ứng nhấp nháy */
-        @keyframes blink-animation {
-          0% { opacity: 1; }
-          50% { opacity: 0.2; }
-          100% { opacity: 1; }
+        /* Hiệu ứng nhấp nháy chậm */
+        @keyframes blink-slow-animation {
+          0% { opacity: 1; transform: scale(1); }
+          50% { opacity: 0.5; transform: scale(1.02); }
+          100% { opacity: 1; transform: scale(1); }
         }
 
         .animate-popup-in {
           animation: slideInUp 0.4s cubic-bezier(0.16, 1, 0.3, 1) forwards;
         }
 
-        /* Class đặc biệt cho cán bộ Đặng Văn Nê */
+        /* Class đặc biệt cho cán bộ lãnh đạo chủ chốt */
         .special-official-tag {
-          color: #fbbf24 !important; /* Vàng hổ phách */
+          color: #fbbf24 !important; /* Màu vàng Amber rực rỡ */
           font-size: 16px !important;
-          animation: blink-animation 1s infinite;
-          text-shadow: 0 0 8px rgba(251, 191, 36, 0.4);
+          animation: blink-slow-animation 2.5s ease-in-out infinite;
+          text-shadow: 0 0 10px rgba(251, 191, 36, 0.5);
+          font-weight: 900 !important;
+          letter-spacing: -0.01em;
+          display: inline-block;
         }
 
         /* Vùng in mặc định bị ẩn trên màn hình */
@@ -93,6 +96,14 @@
           }
 
           .print-hidden { display: none !important; }
+
+          /* Khi in không nhấp nháy và không màu vàng quá mức để tiết kiệm mực */
+          .special-official-tag {
+            color: black !important;
+            font-size: 11pt !important;
+            animation: none !important;
+            text-shadow: none !important;
+          }
         }
 
         .custom-scrollbar::-webkit-scrollbar { width: 6px; }

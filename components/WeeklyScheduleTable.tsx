@@ -122,6 +122,8 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
     return map;
   }, [schedule]);
 
+  const specialOfficials = ['Đặng Văn Nê', 'Trần Thị Hòa Bình', 'Phan Hồng Khanh'];
+
   return (
     <div className="overflow-x-auto bg-white rounded-3xl shadow-2xl border border-slate-200">
       <table className="w-full border-collapse table-fixed min-w-[1100px]">
@@ -133,11 +135,11 @@ const WeeklyScheduleTable: React.FC<Props> = ({ schedule, officials, selectedDat
               <span className="text-xs font-black uppercase tracking-tight text-white">Thứ / Ngày</span>
             </th>
             {officials.map(off => {
-              const isSpecial = off.name === 'Đặng Văn Nê';
+              const isSpecial = specialOfficials.includes(off.name);
               return (
                 <th key={off.id} className="p-5 border-b border-slate-700 text-center">
-                  <div className="font-black text-xs lg:text-[13px] leading-tight uppercase tracking-tight text-white">{off.title}</div>
-                  <div className={`mt-1.5 font-black uppercase tracking-widest bg-white/10 py-1 px-2 rounded-lg inline-block ${isSpecial ? 'special-official-tag' : 'text-[10px] text-red-500'}`}>
+                  <div className="font-black text-xs lg:text-[13px] leading-tight uppercase tracking-tight text-white/70">{off.title}</div>
+                  <div className={`mt-1.5 font-black uppercase tracking-widest bg-white/5 py-1 px-3 rounded-xl inline-block ${isSpecial ? 'special-official-tag' : 'text-[10px] text-red-500'}`}>
                     Đ/c {off.name}
                   </div>
                 </th>
