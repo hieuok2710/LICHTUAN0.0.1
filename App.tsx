@@ -83,18 +83,23 @@ const App: React.FC = () => {
   const handleExportDocx = () => {
     const dateNow = new Date();
     const dateStr = `${dateNow.getDate()} tháng ${dateNow.getMonth() + 1} năm ${dateNow.getFullYear()}`;
-    
-    // Logic export word linh hoạt theo orientation (ngang mặc định rộng hơn)
     const isLandscape = printOrientation === 'landscape';
+    
+    // Thiết lập CSS đặc thù cho Microsoft Word (Mso)
     const css = `
       <style>
-        @page WordSection1 { size: ${isLandscape ? '841.9pt 595.3pt' : '595.3pt 841.9pt'}; margin: 42.5pt 42.5pt 42.5pt ${isLandscape ? '42.5pt' : '85.05pt'}; }
+        @page WordSection1 {
+          size: ${isLandscape ? '29.7cm 21cm' : '21cm 29.7cm'};
+          margin: 1.5cm 1.5cm 1.5cm ${isLandscape ? '1.5cm' : '2.5cm'};
+          mso-page-orientation: ${isLandscape ? 'landscape' : 'portrait'};
+        }
         div.WordSection1 { page: WordSection1; }
-        table { border-collapse: collapse; width: 100%; border: 1px solid black; }
-        th, td { border: 1px solid black; padding: 5pt; font-family: "Times New Roman", serif; font-size: 11pt; }
+        table { border-collapse: collapse; width: 100%; border: 1.0pt solid black; mso-table-lspace: 7pt; mso-table-rspace: 7pt; }
+        th, td { border: 1.0pt solid black; padding: 5pt; font-family: "Times New Roman", serif; font-size: 11pt; color: black; }
         .text-center { text-align: center; }
         .font-bold { font-weight: bold; }
         .uppercase { text-transform: uppercase; }
+        .italic { font-style: italic; }
       </style>
     `;
 
@@ -107,29 +112,30 @@ const App: React.FC = () => {
 
     const htmlContent = `
       <div class="WordSection1">
-        <table border="0" style="border:none; width:100%;">
+        <table border="0" style="border:none; width:100%; margin-bottom: 20pt;">
           <tr>
-            <td style="border:none; width:45%; text-align:center;">
-              <p class="uppercase">ĐẢNG ỦY PHƯỜNG LONG PHÚ</p>
-              <p class="font-bold uppercase" style="text-decoration: underline;">VĂN PHÒNG</p>
+            <td style="border:none; width:45%; text-align:center; vertical-align: top;">
+              <p class="uppercase" style="margin:0;">ĐẢNG ỦY PHƯỜNG LONG PHÚ</p>
+              <p class="font-bold uppercase" style="margin:0; text-decoration: underline;">VĂN PHÒNG</p>
+              <p class="italic" style="margin:5pt 0 0 0; font-size: 10pt;">Số: .....-TB/VP</p>
             </td>
-            <td style="border:none; text-align:center;">
-              <p class="font-bold uppercase">ĐẢNG CỘNG SẢN VIỆT NAM</p>
-              <p style="font-style:italic;">Long Phú, ngày ${dateStr}</p>
+            <td style="border:none; text-align:center; vertical-align: top;">
+              <p class="font-bold uppercase" style="margin:0;">ĐẢNG CỘNG SẢN VIỆT NAM</p>
+              <p class="italic" style="margin:5pt 0 0 0;">Long Phú, ngày ${dateStr}</p>
             </td>
           </tr>
         </table>
 
-        <div class="text-center" style="margin-top:20pt; margin-bottom:20pt;">
-          <p class="font-bold" style="font-size:14pt; text-transform:uppercase;">THÔNG BÁO</p>
-          <p class="font-bold" style="font-size:13pt; text-transform:uppercase;">Chương trình công tác của Thường trực Đảng ủy</p>
-          <p class="font-bold" style="font-size:13pt;">(Từ ngày ${weekRange.startStr} đến ngày ${weekRange.endStr})</p>
+        <div class="text-center" style="margin-bottom:20pt;">
+          <p class="font-bold" style="font-size:14pt; text-transform:uppercase; margin:0;">THÔNG BÁO</p>
+          <p class="font-bold" style="font-size:13pt; text-transform:uppercase; margin:5pt 0 0 0;">Chương trình công tác của Thường trực Đảng ủy</p>
+          <p class="font-bold" style="font-size:13pt; margin:2pt 0 0 0;">(Từ ngày ${weekRange.startStr} đến ngày ${weekRange.endStr})</p>
         </div>
 
-        <table>
+        <table style="width:100%;">
           <tr style="background-color:#f3f3f3;">
-            <th style="width:10%;">Thứ/Ngày</th>
-            ${officials.map(o => `<th>${o.title.toUpperCase()}<br/>Đ/c ${o.name}</th>`).join('')}
+            <th style="width:12%; text-align:center;">Thứ/Ngày</th>
+            ${officials.map(o => `<th style="text-align:center;">${o.title.toUpperCase()}<br/>Đ/c ${o.name}</th>`).join('')}
           </tr>
           ${['Thứ Hai', 'Thứ Ba', 'Thứ Tư', 'Thứ Năm', 'Thứ Sáu', 'Thứ Bảy', 'Chủ Nhật'].map((day, idx) => {
             const d = new Date(weekRange.start);
@@ -139,7 +145,7 @@ const App: React.FC = () => {
             
             return `
               <tr>
-                <td class="text-center font-bold">${day}<br/>${dateStrCol}</td>
+                <td class="text-center font-bold" style="vertical-align: middle;">${day}<br/>${dateStrCol}</td>
                 ${officials.map(off => {
                   const items = schedule.filter(i => {
                     const ids = i.officialIds && i.officialIds.length > 0 
@@ -149,7 +155,7 @@ const App: React.FC = () => {
                   }).sort((a,b) => a.time.localeCompare(b.time));
                   return `
                     <td style="vertical-align:top; text-align:justify;">
-                      ${items.length > 0 ? items.map(item => `<div>- <b>${item.time}:</b> ${item.description} <b>(${item.location})</b></div>`).join('') : '<i style="color:#999;">- Làm việc thường xuyên</i>'}
+                      ${items.length > 0 ? items.map(item => `<div style="margin-bottom:4pt;">- <b>${item.time}:</b> ${item.description} <b>(${item.location})</b></div>`).join('') : '<i style="color:#666; font-size:10pt;">- Làm việc thường xuyên</i>'}
                     </td>
                   `;
                 }).join('')}
@@ -160,34 +166,50 @@ const App: React.FC = () => {
 
         <table border="0" style="border:none; width:100%; margin-top:30pt;">
           <tr>
-            <td style="border:none; width:50%;">
-              <p class="font-bold" style="text-decoration:underline; font-style:italic;">Nơi nhận:</p>
-              <p>- Thường trực Đảng ủy;</p>
-              <p>- UBND phường;</p>
-              <p>- Lưu Văn phòng.</p>
+            <td style="border:none; width:50%; vertical-align: top;">
+              <p class="font-bold italic" style="text-decoration:underline; margin:0;">Nơi nhận:</p>
+              <p style="margin:2pt 0;">- Thường trực Đảng ủy;</p>
+              <p style="margin:2pt 0;">- UBND phường;</p>
+              <p style="margin:2pt 0;">- Lưu Văn phòng.</p>
             </td>
-            <td style="border:none; text-align:center;">
-              <p class="font-bold uppercase">CHÁNH VĂN PHÒNG</p>
-              <br/><br/><br/><br/>
-              <p class="font-bold">Nguyễn Thế Anh</p>
+            <td style="border:none; text-align:center; vertical-align: top;">
+              <p class="font-bold uppercase" style="margin:0;">CHÁNH VĂN PHÒNG</p>
+              <div style="height:60pt;"></div>
+              <p class="font-bold" style="margin:0;">Nguyễn Thế Anh</p>
             </td>
           </tr>
         </table>
       </div>
     `;
 
+    // Sử dụng định dạng .doc (HTML-based) tương thích cao nhất với Word
     const fullDoc = `
       <html xmlns:o='urn:schemas-microsoft-com:office:office' xmlns:w='urn:schemas-microsoft-com:office:word' xmlns='http://www.w3.org/TR/REC-html40'>
-      <head><meta charset='utf-8'>${css}</head>
-      <body>${htmlContent}</body></html>
+      <head>
+        <meta charset='utf-8'>
+        <!--[if gte mso 9]>
+        <xml>
+          <w:WordDocument>
+            <w:View>Print</w:View>
+            <w:Zoom>100</w:Zoom>
+            <w:DoNotOptimizeForBrowser/>
+          </w:WordDocument>
+        </xml>
+        <![endif]-->
+        ${css}
+      </head>
+      <body>${htmlContent}</body>
+      </html>
     `;
 
-    const blob = new Blob(['\ufeff', fullDoc], { type: 'application/vnd.openxmlformats-officedocument.wordprocessingml.document' });
+    // Xuất file với MIME type và extension đồng bộ để tránh báo lỗi Corrupted
+    const blob = new Blob(['\ufeff', fullDoc], { type: 'application/msword' });
     const url = URL.createObjectURL(blob);
     const link = document.createElement('a');
     link.href = url;
-    link.download = `Lich_Cong_Tac_${weekRange.startStr.replace(/\//g, '-')}.docx`;
+    link.download = `Lich_Cong_Tac_${weekRange.startStr.replace(/\//g, '-')}.doc`;
     link.click();
+    URL.revokeObjectURL(url);
   };
 
   const changeWeek = (offset: number) => {
@@ -258,7 +280,7 @@ const App: React.FC = () => {
                 <div>
                    <h2 className="font-black text-lg uppercase tracking-tight text-slate-900">Xem trước bản in</h2>
                    <div className="flex items-center gap-2">
-                     <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest italic">Sẵn sàng xuất PDF</span>
+                     <span className="text-[10px] text-emerald-600 font-bold uppercase tracking-widest italic">Sẵn sàng xuất PDF/Word</span>
                    </div>
                 </div>
               </div>
@@ -269,25 +291,24 @@ const App: React.FC = () => {
                   onClick={() => setPrintOrientation('portrait')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase transition-all ${printOrientation === 'portrait' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                  <Layout size={14} className="rotate-0" /> Khổ dọc (A4)
+                  <Layout size={14} className="rotate-0" /> Khổ dọc
                 </button>
                 <button 
                   onClick={() => setPrintOrientation('landscape')}
                   className={`flex items-center gap-2 px-4 py-2.5 rounded-xl text-[11px] font-black uppercase transition-all ${printOrientation === 'landscape' ? 'bg-white text-slate-900 shadow-sm' : 'text-slate-500 hover:text-slate-700'}`}
                 >
-                  <Maximize2 size={14} className="rotate-90" /> Khổ ngang (A4)
+                  <Maximize2 size={14} className="rotate-90" /> Khổ ngang
                 </button>
               </div>
 
               <div className="flex gap-3">
-                <button onClick={handleExportDocx} className="hidden sm:flex items-center gap-2 bg-blue-100 text-blue-700 border border-blue-200 px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-200 transition-all shadow-sm"><FileText size={18} /> Word</button>
-                <button onClick={handlePrint} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-300"><Printer size={18} /> In ngay (PDF)</button>
+                <button onClick={handleExportDocx} className="flex items-center gap-2 bg-blue-600 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-blue-700 transition-all shadow-lg shadow-blue-100"><FileText size={18} /> Xuất Word (.doc)</button>
+                <button onClick={handlePrint} className="flex items-center gap-2 bg-slate-900 text-white px-6 py-3 rounded-2xl text-xs font-black uppercase tracking-widest hover:bg-black transition-all shadow-lg shadow-slate-300"><Printer size={18} /> In nhanh (PDF)</button>
                 <button onClick={() => setShowPreviewModal(false)} className="ml-2 p-3 text-slate-400 hover:text-slate-600 hover:bg-slate-200 rounded-full transition-all"><X size={24} /></button>
               </div>
             </div>
             
             <div className="flex-1 overflow-y-auto p-8 md:p-12 bg-slate-200 flex justify-center custom-scrollbar">
-              {/* GIẢ LẬP TỜ GIẤY THEO ORIENTATION */}
               <div 
                 className={`bg-white shadow-[0_20px_50px_rgba(0,0,0,0.15)] ring-1 ring-slate-300 transition-all duration-500 ease-in-out ${
                   printOrientation === 'portrait' 
@@ -300,7 +321,7 @@ const App: React.FC = () => {
             </div>
 
             <div className="p-4 bg-white border-t flex justify-center">
-              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Hệ thống hỗ trợ in ấn thông minh v1.0 - Văn phòng Phường Long Phú</p>
+              <p className="text-[10px] text-slate-400 font-bold uppercase tracking-[0.2em]">Hệ thống hỗ trợ in ấn thông minh v1.1 - Văn phòng Phường Long Phú</p>
             </div>
           </div>
         </div>
